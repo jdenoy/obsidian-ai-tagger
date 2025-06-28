@@ -127,7 +127,7 @@ var DEFAULT_SETTINGS = {
   defaultProvider: "openai",
   maxTags: 5,
   minTags: 2,
-  customPrompt: "Generate relevant tags for this note content. Focus on main topics, themes, and categories. Return tags as a comma-separated list.",
+  customPrompt: "Generate relevant tags for this note content. Focus on main topics, themes, and categories. Return tags as a comma-separated list. Each tag will not contain spaces, but dashes.",
   batchProcessing: false,
   autoApplyTags: false,
   excludeExistingTags: true
@@ -214,12 +214,10 @@ var AITaggerPlugin = class extends import_obsidian.Plugin {
   }
   extractExistingTags(content) {
     const frontmatterMatch = content.match(/^---\s*\n(.*?)\n---\s*\n/s);
-    if (!frontmatterMatch)
-      return [];
+    if (!frontmatterMatch) return [];
     const frontmatter = frontmatterMatch[1];
     const tagsMatch = frontmatter.match(/tags:\s*\[(.*?)\]/s) || frontmatter.match(/tags:\s*\n((?:\s*-\s*.+\n?)*)/);
-    if (!tagsMatch)
-      return [];
+    if (!tagsMatch) return [];
     if (tagsMatch[1].includes("[")) {
       return tagsMatch[1].split(",").map((tag) => tag.trim().replace(/['"]/g, ""));
     } else {

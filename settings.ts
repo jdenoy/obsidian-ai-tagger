@@ -16,7 +16,7 @@ export const DEFAULT_SETTINGS: AITaggerSettings = {
 	defaultProvider: 'openai',
 	maxTags: 5,
 	minTags: 2,
-	customPrompt: 'Generate relevant tags for this note content. Focus on main topics, themes, and categories. Return tags as a comma-separated list.',
+	customPrompt: 'Generate relevant tags for this note content. Focus on main topics, themes, and categories. Return tags as a comma-separated list. Each tag will not contain spaces, but dashes.',
 	batchProcessing: false,
 	autoApplyTags: false,
 	excludeExistingTags: true

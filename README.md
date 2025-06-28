@@ -48,6 +48,8 @@ An Obsidian plugin that automatically generates 2-5 relevant tags for your notes
 - Use the command palette: "Generate tags for all notes"
 - This will process all markdown files in your vault
 - ⚠️ **Warning**: This may consume significant API credits for large vaults
+- ⚠️ **Warning**: If you have not allowed "Auto Apply Tags" in settings, you will need to approuve tag additions on every note
+
 
 ### Tag Preview
 

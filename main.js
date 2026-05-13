@@ -27,23 +27,258 @@ __export(main_exports, {
   default: () => AITaggerPlugin
 });
 module.exports = __toCommonJS(main_exports);
-var import_obsidian = require("obsidian");
+var import_obsidian2 = require("obsidian");
+
+// rate-limiter.ts
+var RateLimiter = class {
+  constructor(config) {
+    this.requests = [];
+    this.windowMs = 6e4;
+    this.maxRequests = config.requestsPerMinute;
+  }
+  updateConfig(config) {
+    this.maxRequests = config.requestsPerMinute;
+  }
+  async waitIfNeeded() {
+    const now = Date.now();
+    this.requests = this.requests.filter(
+      (timestamp) => now - timestamp < this.windowMs
+    );
+    if (this.requests.length >= this.maxRequests) {
+      const oldestRequest = Math.min(...this.requests);
+      const waitTime = this.windowMs - (now - oldestRequest) + 100;
+      if (waitTime > 0) {
+        await new Promise((resolve) => setTimeout(resolve, waitTime));
+        return this.waitIfNeeded();
+      }
+    }
+    this.requests.push(now);
+  }
+  getRemainingRequests() {
+    const now = Date.now();
+    this.requests = this.requests.filter(
+      (timestamp) => now - timestamp < this.windowMs
+    );
+    return Math.max(0, this.maxRequests - this.requests.length);
+  }
+  getTimeUntilReset() {
+    if (this.requests.length === 0) return 0;
+    const now = Date.now();
+    const oldestRequest = Math.min(...this.requests);
+    return Math.max(0, this.windowMs - (now - oldestRequest));
+  }
+};
+
+// i18n.ts
+var translations = {
+  en: {
+    // Plugin general
+    "plugin.name": "AI Tagger",
+    "plugin.description": "Automatically generate relevant tags for your notes using AI",
+    // Commands
+    "command.generateTags": "Generate tags for current note",
+    "command.generateTagsAll": "Generate tags for all notes",
+    // Ribbon
+    "ribbon.generateTags": "Generate AI Tags",
+    // Notices
+    "notice.noActiveFile": "No active file",
+    "notice.notMarkdown": "Active file is not a markdown file",
+    "notice.generatingTags": "Generating tags...",
+    "notice.noTagsGenerated": "No tags generated",
+    "notice.noNewTags": "No new tags to add",
+    "notice.tagsAdded": "Added {count} tags: {tags}",
+    "notice.errorGenerating": "Error generating tags: {error}",
+    "notice.batchComplete": "Batch processing complete. Processed: {processed}, Errors: {errors}",
+    "notice.processingFiles": "Processing {count} files...",
+    "notice.processedFiles": "Processed {processed}/{total} files...",
+    "notice.rateLimitHit": "Rate limit reached. Waiting {seconds} seconds...",
+    "notice.retryingRequest": "Request failed, retrying ({attempt}/{maxAttempts})...",
+    // Settings
+    "settings.title": "AI Tagger Settings",
+    "settings.language": "Language",
+    "settings.language.desc": "Choose interface language",
+    "settings.defaultProvider": "Default AI Provider",
+    "settings.defaultProvider.desc": "Choose between OpenAI (ChatGPT) or Claude",
+    "settings.openaiKey": "OpenAI API Key",
+    "settings.openaiKey.desc": "Your OpenAI API key",
+    "settings.claudeKey": "Claude API Key",
+    "settings.claudeKey.desc": "Your Anthropic Claude API key",
+    "settings.minTags": "Minimum Tags",
+    "settings.minTags.desc": "Minimum number of tags to generate",
+    "settings.maxTags": "Maximum Tags",
+    "settings.maxTags.desc": "Maximum number of tags to generate",
+    "settings.customPrompt": "Custom Prompt",
+    "settings.customPrompt.desc": "Custom prompt to use for tag generation",
+    "settings.autoApply": "Auto Apply Tags",
+    "settings.autoApply.desc": "Automatically apply generated tags without preview",
+    "settings.excludeExisting": "Exclude Existing Tags",
+    "settings.excludeExisting.desc": "Do not generate tags that already exist in the note",
+    "settings.rateLimit": "Rate Limit (requests/minute)",
+    "settings.rateLimit.desc": "Maximum API requests per minute",
+    "settings.maxRetries": "Max Retries",
+    "settings.maxRetries.desc": "Maximum retry attempts for failed API calls",
+    // Modals
+    "modal.tagPreview.title": "Generated Tags Preview",
+    "modal.tagPreview.file": "File: {filename}",
+    "modal.tagPreview.apply": "Apply Selected Tags",
+    "modal.tagPreview.cancel": "Cancel",
+    "modal.batchProcessing.title": "Batch Processing",
+    "modal.batchProcessing.description": "This will generate tags for all markdown files in your vault.",
+    "modal.batchProcessing.warning": "\u26A0\uFE0F This may take a while and consume API credits. Are you sure?",
+    "modal.batchProcessing.proceed": "Proceed",
+    "modal.batchProcessing.cancel": "Cancel",
+    // Errors
+    "error.openaiKeyMissing": "OpenAI API key not configured",
+    "error.claudeKeyMissing": "Claude API key not configured",
+    "error.openaiApi": "OpenAI API error: {status}",
+    "error.claudeApi": "Claude API error: {status}",
+    "error.openaiError": "OpenAI error: {message}",
+    "error.claudeError": "Claude error: {message}",
+    "error.maxRetriesReached": "Maximum retry attempts reached",
+    "error.rateLimitExceeded": "Rate limit exceeded"
+  },
+  fr: {
+    // Plugin général
+    "plugin.name": "AI Tagger",
+    "plugin.description": "G\xE9n\xE8re automatiquement des tags pertinents pour vos notes avec l'IA",
+    // Commandes
+    "command.generateTags": "G\xE9n\xE9rer des tags pour la note actuelle",
+    "command.generateTagsAll": "G\xE9n\xE9rer des tags pour toutes les notes",
+    // Ruban
+    "ribbon.generateTags": "G\xE9n\xE9rer des Tags IA",
+    // Notifications
+    "notice.noActiveFile": "Aucun fichier actif",
+    "notice.notMarkdown": "Le fichier actif n'est pas un fichier markdown",
+    "notice.generatingTags": "G\xE9n\xE9ration des tags...",
+    "notice.noTagsGenerated": "Aucun tag g\xE9n\xE9r\xE9",
+    "notice.noNewTags": "Aucun nouveau tag \xE0 ajouter",
+    "notice.tagsAdded": "{count} tags ajout\xE9s : {tags}",
+    "notice.errorGenerating": "Erreur lors de la g\xE9n\xE9ration des tags : {error}",
+    "notice.batchComplete": "Traitement par lot termin\xE9. Trait\xE9s : {processed}, Erreurs : {errors}",
+    "notice.processingFiles": "Traitement de {count} fichiers...",
+    "notice.processedFiles": "Trait\xE9s {processed}/{total} fichiers...",
+    "notice.rateLimitHit": "Limite de d\xE9bit atteinte. Attente de {seconds} secondes...",
+    "notice.retryingRequest": "\xC9chec de la requ\xEAte, nouvelle tentative ({attempt}/{maxAttempts})...",
+    // Paramètres
+    "settings.title": "Param\xE8tres AI Tagger",
+    "settings.language": "Langue",
+    "settings.language.desc": "Choisir la langue de l'interface",
+    "settings.defaultProvider": "Fournisseur IA par d\xE9faut",
+    "settings.defaultProvider.desc": "Choisir entre OpenAI (ChatGPT) ou Claude",
+    "settings.openaiKey": "Cl\xE9 API OpenAI",
+    "settings.openaiKey.desc": "Votre cl\xE9 API OpenAI",
+    "settings.claudeKey": "Cl\xE9 API Claude",
+    "settings.claudeKey.desc": "Votre cl\xE9 API Anthropic Claude",
+    "settings.minTags": "Tags minimum",
+    "settings.minTags.desc": "Nombre minimum de tags \xE0 g\xE9n\xE9rer",
+    "settings.maxTags": "Tags maximum",
+    "settings.maxTags.desc": "Nombre maximum de tags \xE0 g\xE9n\xE9rer",
+    "settings.customPrompt": "Prompt personnalis\xE9",
+    "settings.customPrompt.desc": "Prompt personnalis\xE9 pour la g\xE9n\xE9ration de tags",
+    "settings.autoApply": "Appliquer automatiquement",
+    "settings.autoApply.desc": "Appliquer automatiquement les tags g\xE9n\xE9r\xE9s sans aper\xE7u",
+    "settings.excludeExisting": "Exclure les tags existants",
+    "settings.excludeExisting.desc": "Ne pas g\xE9n\xE9rer les tags qui existent d\xE9j\xE0 dans la note",
+    "settings.rateLimit": "Limite de d\xE9bit (requ\xEAtes/minute)",
+    "settings.rateLimit.desc": "Nombre maximum de requ\xEAtes API par minute",
+    "settings.maxRetries": "Tentatives maximum",
+    "settings.maxRetries.desc": "Nombre maximum de tentatives pour les appels API \xE9chou\xE9s",
+    // Modales
+    "modal.tagPreview.title": "Aper\xE7u des tags g\xE9n\xE9r\xE9s",
+    "modal.tagPreview.file": "Fichier : {filename}",
+    "modal.tagPreview.apply": "Appliquer les tags s\xE9lectionn\xE9s",
+    "modal.tagPreview.cancel": "Annuler",
+    "modal.batchProcessing.title": "Traitement par lot",
+    "modal.batchProcessing.description": "Ceci g\xE9n\xE8rera des tags pour tous les fichiers markdown de votre coffre.",
+    "modal.batchProcessing.warning": "\u26A0\uFE0F Cela peut prendre du temps et consommer des cr\xE9dits API. \xCAtes-vous s\xFBr ?",
+    "modal.batchProcessing.proceed": "Continuer",
+    "modal.batchProcessing.cancel": "Annuler",
+    // Erreurs
+    "error.openaiKeyMissing": "Cl\xE9 API OpenAI non configur\xE9e",
+    "error.claudeKeyMissing": "Cl\xE9 API Claude non configur\xE9e",
+    "error.openaiApi": "Erreur API OpenAI : {status}",
+    "error.claudeApi": "Erreur API Claude : {status}",
+    "error.openaiError": "Erreur OpenAI : {message}",
+    "error.claudeError": "Erreur Claude : {message}",
+    "error.maxRetriesReached": "Nombre maximum de tentatives atteint",
+    "error.rateLimitExceeded": "Limite de d\xE9bit d\xE9pass\xE9e"
+  }
+};
+var I18n = class {
+  constructor(language = "en") {
+    this.currentLanguage = "en";
+    this.currentLanguage = language;
+  }
+  setLanguage(language) {
+    this.currentLanguage = language;
+  }
+  getCurrentLanguage() {
+    return this.currentLanguage;
+  }
+  t(key, params) {
+    const translation = translations[this.currentLanguage][key] || translations.en[key] || key;
+    if (!params) {
+      return translation;
+    }
+    return translation.replace(/\{(\w+)\}/g, (match, paramKey) => {
+      var _a;
+      return ((_a = params[paramKey]) == null ? void 0 : _a.toString()) || match;
+    });
+  }
+};
+var i18n = new I18n();
 
 // ai-service.ts
+var import_obsidian = require("obsidian");
 var AIService = class {
   constructor(settings) {
     this.settings = settings;
+    this.rateLimiter = new RateLimiter({ requestsPerMinute: settings.rateLimit });
+  }
+  updateSettings(settings) {
+    this.settings = settings;
+    this.rateLimiter.updateConfig({ requestsPerMinute: settings.rateLimit });
   }
   async generateTags(content) {
+    await this.rateLimiter.waitIfNeeded();
     if (this.settings.defaultProvider === "openai") {
-      return this.generateTagsWithOpenAI(content);
+      return this.generateTagsWithRetry(content, "openai");
     } else {
-      return this.generateTagsWithClaude(content);
+      return this.generateTagsWithRetry(content, "claude");
     }
+  }
+  async generateTagsWithRetry(content, provider) {
+    let lastError = "";
+    for (let attempt = 1; attempt <= this.settings.maxRetries; attempt++) {
+      try {
+        if (attempt > 1) {
+          new import_obsidian.Notice(i18n.t("notice.retryingRequest", {
+            attempt: attempt.toString(),
+            maxAttempts: this.settings.maxRetries.toString()
+          }));
+          const delay = Math.pow(2, attempt - 1) * 1e3;
+          await new Promise((resolve) => setTimeout(resolve, delay));
+        }
+        if (provider === "openai") {
+          return await this.generateTagsWithOpenAI(content);
+        } else {
+          return await this.generateTagsWithClaude(content);
+        }
+      } catch (error) {
+        lastError = error.message;
+        if (error.message.includes("401") || error.message.includes("403")) {
+          return { tags: [], error: lastError };
+        }
+        if (error.message.includes("429")) {
+          return { tags: [], error: i18n.t("error.rateLimitExceeded") };
+        }
+      }
+    }
+    return { tags: [], error: i18n.t("error.maxRetriesReached") + ": " + lastError };
   }
   async generateTagsWithOpenAI(content) {
     if (!this.settings.openaiApiKey) {
-      return { tags: [], error: "OpenAI API key not configured" };
+      return { tags: [], error: i18n.t("error.openaiKeyMissing") };
     }
     try {
       const response = await fetch("https://api.openai.com/v1/chat/completions", {
@@ -69,19 +304,19 @@ var AIService = class {
         })
       });
       if (!response.ok) {
-        throw new Error(`OpenAI API error: ${response.status}`);
+        throw new Error(i18n.t("error.openaiApi", { status: response.status.toString() }));
       }
       const data = await response.json();
       const tagsText = data.choices[0].message.content.trim();
       const tags = this.parseTags(tagsText);
       return { tags };
     } catch (error) {
-      return { tags: [], error: `OpenAI error: ${error.message}` };
+      throw new Error(i18n.t("error.openaiError", { message: error.message }));
     }
   }
   async generateTagsWithClaude(content) {
     if (!this.settings.claudeApiKey) {
-      return { tags: [], error: "Claude API key not configured" };
+      return { tags: [], error: i18n.t("error.claudeKeyMissing") };
     }
     try {
       const response = await fetch("https://api.anthropic.com/v1/messages", {
@@ -105,14 +340,14 @@ Content: ${content.substring(0, 4e3)}`
         })
       });
       if (!response.ok) {
-        throw new Error(`Claude API error: ${response.status}`);
+        throw new Error(i18n.t("error.claudeApi", { status: response.status.toString() }));
       }
       const data = await response.json();
       const tagsText = data.content[0].text.trim();
       const tags = this.parseTags(tagsText);
       return { tags };
     } catch (error) {
-      return { tags: [], error: `Claude error: ${error.message}` };
+      throw new Error(i18n.t("error.claudeError", { message: error.message }));
     }
   }
   parseTags(tagsText) {
@@ -130,27 +365,31 @@ var DEFAULT_SETTINGS = {
   customPrompt: "Generate relevant tags for this note content. Focus on main topics, themes, and categories. Return tags as a comma-separated list. Each tag will not contain spaces, but dashes.",
   batchProcessing: false,
   autoApplyTags: false,
-  excludeExistingTags: true
+  excludeExistingTags: true,
+  language: "en",
+  rateLimit: 10,
+  maxRetries: 3
 };
 
 // main.ts
-var AITaggerPlugin = class extends import_obsidian.Plugin {
+var AITaggerPlugin = class extends import_obsidian2.Plugin {
   async onload() {
     await this.loadSettings();
+    i18n.setLanguage(this.settings.language);
     this.aiService = new AIService(this.settings);
-    this.addRibbonIcon("tag", "Generate AI Tags", () => {
+    this.addRibbonIcon("tag", i18n.t("ribbon.generateTags"), () => {
       this.generateTagsForActiveFile();
     });
     this.addCommand({
       id: "generate-tags-current-note",
-      name: "Generate tags for current note",
+      name: i18n.t("command.generateTags"),
       callback: () => {
         this.generateTagsForActiveFile();
       }
     });
     this.addCommand({
       id: "generate-tags-all-notes",
-      name: "Generate tags for all notes",
+      name: i18n.t("command.generateTagsAll"),
       callback: () => {
         this.showBatchProcessingModal();
       }
@@ -160,29 +399,29 @@ var AITaggerPlugin = class extends import_obsidian.Plugin {
   async generateTagsForActiveFile() {
     const activeFile = this.app.workspace.getActiveFile();
     if (!activeFile) {
-      new import_obsidian.Notice("No active file");
+      new import_obsidian2.Notice(i18n.t("notice.noActiveFile"));
       return;
     }
     if (activeFile.extension !== "md") {
-      new import_obsidian.Notice("Active file is not a markdown file");
+      new import_obsidian2.Notice(i18n.t("notice.notMarkdown"));
       return;
     }
     await this.generateTagsForFile(activeFile);
   }
   async generateTagsForFile(file) {
-    const notice = new import_obsidian.Notice("Generating tags...", 0);
+    const notice = new import_obsidian2.Notice(i18n.t("notice.generatingTags"), 0);
     try {
       const content = await this.app.vault.read(file);
       const contentWithoutFrontmatter = this.removeYamlFrontmatter(content);
       const response = await this.aiService.generateTags(contentWithoutFrontmatter);
       if (response.error) {
         notice.hide();
-        new import_obsidian.Notice(`Error: ${response.error}`);
+        new import_obsidian2.Notice(i18n.t("notice.errorGenerating", { error: response.error }));
         return;
       }
       if (response.tags.length === 0) {
         notice.hide();
-        new import_obsidian.Notice("No tags generated");
+        new import_obsidian2.Notice(i18n.t("notice.noTagsGenerated"));
         return;
       }
       const existingTags = this.extractExistingTags(content);
@@ -192,20 +431,20 @@ var AITaggerPlugin = class extends import_obsidian.Plugin {
       }
       if (newTags.length === 0) {
         notice.hide();
-        new import_obsidian.Notice("No new tags to add");
+        new import_obsidian2.Notice(i18n.t("notice.noNewTags"));
         return;
       }
       if (this.settings.autoApplyTags) {
         await this.applyTagsToFile(file, newTags);
         notice.hide();
-        new import_obsidian.Notice(`Added ${newTags.length} tags: ${newTags.join(", ")}`);
+        new import_obsidian2.Notice(i18n.t("notice.tagsAdded", { count: newTags.length.toString(), tags: newTags.join(", ") }));
       } else {
         notice.hide();
         this.showTagPreviewModal(file, newTags);
       }
     } catch (error) {
       notice.hide();
-      new import_obsidian.Notice(`Error generating tags: ${error.message}`);
+      new import_obsidian2.Notice(i18n.t("notice.errorGenerating", { error: error.message }));
     }
   }
   removeYamlFrontmatter(content) {
@@ -260,7 +499,7 @@ ${content}`;
     new TagPreviewModal(this.app, file, tags, async (selectedTags) => {
       if (selectedTags.length > 0) {
         await this.applyTagsToFile(file, selectedTags);
-        new import_obsidian.Notice(`Added ${selectedTags.length} tags: ${selectedTags.join(", ")}`);
+        new import_obsidian2.Notice(i18n.t("notice.tagsAdded", { count: selectedTags.length.toString(), tags: selectedTags.join(", ") }));
       }
     }).open();
   }
@@ -272,10 +511,11 @@ ${content}`;
   }
   async saveSettings() {
     await this.saveData(this.settings);
-    this.aiService = new AIService(this.settings);
+    i18n.setLanguage(this.settings.language);
+    this.aiService.updateSettings(this.settings);
   }
 };
-var TagPreviewModal = class extends import_obsidian.Modal {
+var TagPreviewModal = class extends import_obsidian2.Modal {
   constructor(app, file, tags, onSubmit) {
     super(app);
     this.file = file;
@@ -285,8 +525,8 @@ var TagPreviewModal = class extends import_obsidian.Modal {
   }
   onOpen() {
     const { contentEl } = this;
-    contentEl.createEl("h2", { text: "Generated Tags Preview" });
-    contentEl.createEl("p", { text: `File: ${this.file.name}` });
+    contentEl.createEl("h2", { text: i18n.t("modal.tagPreview.title") });
+    contentEl.createEl("p", { text: i18n.t("modal.tagPreview.file", { filename: this.file.name }) });
     const tagsContainer = contentEl.createDiv({ cls: "tags-container" });
     this.tags.forEach((tag) => {
       const tagEl = tagsContainer.createDiv({ cls: "tag-item" });
@@ -302,12 +542,12 @@ var TagPreviewModal = class extends import_obsidian.Modal {
       tagEl.createSpan({ text: tag, cls: "tag-text" });
     });
     const buttonContainer = contentEl.createDiv({ cls: "modal-button-container" });
-    const applyButton = buttonContainer.createEl("button", { text: "Apply Selected Tags" });
+    const applyButton = buttonContainer.createEl("button", { text: i18n.t("modal.tagPreview.apply") });
     applyButton.addEventListener("click", () => {
       this.onSubmit(Array.from(this.selectedTags));
       this.close();
     });
-    const cancelButton = buttonContainer.createEl("button", { text: "Cancel" });
+    const cancelButton = buttonContainer.createEl("button", { text: i18n.t("modal.tagPreview.cancel") });
     cancelButton.addEventListener("click", () => {
       this.close();
     });
@@ -317,31 +557,31 @@ var TagPreviewModal = class extends import_obsidian.Modal {
     contentEl.empty();
   }
 };
-var BatchProcessingModal = class extends import_obsidian.Modal {
+var BatchProcessingModal = class extends import_obsidian2.Modal {
   constructor(app, plugin) {
     super(app);
     this.plugin = plugin;
   }
   onOpen() {
     const { contentEl } = this;
-    contentEl.createEl("h2", { text: "Batch Processing" });
-    contentEl.createEl("p", { text: "This will generate tags for all markdown files in your vault." });
+    contentEl.createEl("h2", { text: i18n.t("modal.batchProcessing.title") });
+    contentEl.createEl("p", { text: i18n.t("modal.batchProcessing.description") });
     const warningEl = contentEl.createEl("p", { cls: "warning" });
-    warningEl.setText("\u26A0\uFE0F This may take a while and consume API credits. Are you sure?");
+    warningEl.setText(i18n.t("modal.batchProcessing.warning"));
     const buttonContainer = contentEl.createDiv({ cls: "modal-button-container" });
-    const proceedButton = buttonContainer.createEl("button", { text: "Proceed" });
+    const proceedButton = buttonContainer.createEl("button", { text: i18n.t("modal.batchProcessing.proceed") });
     proceedButton.addEventListener("click", () => {
       this.processBatch();
       this.close();
     });
-    const cancelButton = buttonContainer.createEl("button", { text: "Cancel" });
+    const cancelButton = buttonContainer.createEl("button", { text: i18n.t("modal.batchProcessing.cancel") });
     cancelButton.addEventListener("click", () => {
       this.close();
     });
   }
   async processBatch() {
     const files = this.app.vault.getMarkdownFiles();
-    const notice = new import_obsidian.Notice(`Processing ${files.length} files...`, 0);
+    const notice = new import_obsidian2.Notice(i18n.t("notice.processingFiles", { count: files.length.toString() }), 0);
     let processed = 0;
     let errors = 0;
     for (const file of files) {
@@ -353,18 +593,18 @@ var BatchProcessingModal = class extends import_obsidian.Modal {
         console.error(`Error processing ${file.name}:`, error);
       }
       if (processed % 10 === 0) {
-        notice.setMessage(`Processed ${processed}/${files.length} files...`);
+        notice.setMessage(i18n.t("notice.processedFiles", { processed: processed.toString(), total: files.length.toString() }));
       }
     }
     notice.hide();
-    new import_obsidian.Notice(`Batch processing complete. Processed: ${processed}, Errors: ${errors}`);
+    new import_obsidian2.Notice(i18n.t("notice.batchComplete", { processed: processed.toString(), errors: errors.toString() }));
   }
   onClose() {
     const { contentEl } = this;
     contentEl.empty();
   }
 };
-var AITaggerSettingTab = class extends import_obsidian.PluginSettingTab {
+var AITaggerSettingTab = class extends import_obsidian2.PluginSettingTab {
   constructor(app, plugin) {
     super(app, plugin);
     this.plugin = plugin;
@@ -372,37 +612,50 @@ var AITaggerSettingTab = class extends import_obsidian.PluginSettingTab {
   display() {
     const { containerEl } = this;
     containerEl.empty();
-    containerEl.createEl("h2", { text: "AI Tagger Settings" });
-    new import_obsidian.Setting(containerEl).setName("Default AI Provider").setDesc("Choose between OpenAI (ChatGPT) or Claude").addDropdown((dropdown) => dropdown.addOption("openai", "OpenAI (ChatGPT)").addOption("claude", "Claude").setValue(this.plugin.settings.defaultProvider).onChange(async (value) => {
+    containerEl.createEl("h2", { text: i18n.t("settings.title") });
+    new import_obsidian2.Setting(containerEl).setName(i18n.t("settings.language")).setDesc(i18n.t("settings.language.desc")).addDropdown((dropdown) => dropdown.addOption("en", "English").addOption("fr", "Fran\xE7ais").setValue(this.plugin.settings.language).onChange(async (value) => {
+      this.plugin.settings.language = value;
+      await this.plugin.saveSettings();
+      this.display();
+    }));
+    new import_obsidian2.Setting(containerEl).setName(i18n.t("settings.defaultProvider")).setDesc(i18n.t("settings.defaultProvider.desc")).addDropdown((dropdown) => dropdown.addOption("openai", "OpenAI (ChatGPT)").addOption("claude", "Claude").setValue(this.plugin.settings.defaultProvider).onChange(async (value) => {
       this.plugin.settings.defaultProvider = value;
       await this.plugin.saveSettings();
     }));
-    new import_obsidian.Setting(containerEl).setName("OpenAI API Key").setDesc("Your OpenAI API key").addText((text) => text.setPlaceholder("sk-...").setValue(this.plugin.settings.openaiApiKey).onChange(async (value) => {
+    new import_obsidian2.Setting(containerEl).setName(i18n.t("settings.openaiKey")).setDesc(i18n.t("settings.openaiKey.desc")).addText((text) => text.setPlaceholder("sk-...").setValue(this.plugin.settings.openaiApiKey).onChange(async (value) => {
       this.plugin.settings.openaiApiKey = value;
       await this.plugin.saveSettings();
     }));
-    new import_obsidian.Setting(containerEl).setName("Claude API Key").setDesc("Your Anthropic Claude API key").addText((text) => text.setPlaceholder("sk-ant-...").setValue(this.plugin.settings.claudeApiKey).onChange(async (value) => {
+    new import_obsidian2.Setting(containerEl).setName(i18n.t("settings.claudeKey")).setDesc(i18n.t("settings.claudeKey.desc")).addText((text) => text.setPlaceholder("sk-ant-...").setValue(this.plugin.settings.claudeApiKey).onChange(async (value) => {
       this.plugin.settings.claudeApiKey = value;
       await this.plugin.saveSettings();
     }));
-    new import_obsidian.Setting(containerEl).setName("Minimum Tags").setDesc("Minimum number of tags to generate").addSlider((slider) => slider.setLimits(1, 10, 1).setValue(this.plugin.settings.minTags).setDynamicTooltip().onChange(async (value) => {
+    new import_obsidian2.Setting(containerEl).setName(i18n.t("settings.minTags")).setDesc(i18n.t("settings.minTags.desc")).addSlider((slider) => slider.setLimits(1, 10, 1).setValue(this.plugin.settings.minTags).setDynamicTooltip().onChange(async (value) => {
       this.plugin.settings.minTags = value;
       await this.plugin.saveSettings();
     }));
-    new import_obsidian.Setting(containerEl).setName("Maximum Tags").setDesc("Maximum number of tags to generate").addSlider((slider) => slider.setLimits(1, 10, 1).setValue(this.plugin.settings.maxTags).setDynamicTooltip().onChange(async (value) => {
+    new import_obsidian2.Setting(containerEl).setName(i18n.t("settings.maxTags")).setDesc(i18n.t("settings.maxTags.desc")).addSlider((slider) => slider.setLimits(1, 10, 1).setValue(this.plugin.settings.maxTags).setDynamicTooltip().onChange(async (value) => {
       this.plugin.settings.maxTags = value;
       await this.plugin.saveSettings();
     }));
-    new import_obsidian.Setting(containerEl).setName("Custom Prompt").setDesc("Custom prompt to use for tag generation").addTextArea((text) => text.setPlaceholder("Generate relevant tags...").setValue(this.plugin.settings.customPrompt).onChange(async (value) => {
+    new import_obsidian2.Setting(containerEl).setName(i18n.t("settings.customPrompt")).setDesc(i18n.t("settings.customPrompt.desc")).addTextArea((text) => text.setPlaceholder("Generate relevant tags...").setValue(this.plugin.settings.customPrompt).onChange(async (value) => {
       this.plugin.settings.customPrompt = value;
       await this.plugin.saveSettings();
     }));
-    new import_obsidian.Setting(containerEl).setName("Auto Apply Tags").setDesc("Automatically apply generated tags without preview").addToggle((toggle) => toggle.setValue(this.plugin.settings.autoApplyTags).onChange(async (value) => {
+    new import_obsidian2.Setting(containerEl).setName(i18n.t("settings.autoApply")).setDesc(i18n.t("settings.autoApply.desc")).addToggle((toggle) => toggle.setValue(this.plugin.settings.autoApplyTags).onChange(async (value) => {
       this.plugin.settings.autoApplyTags = value;
       await this.plugin.saveSettings();
     }));
-    new import_obsidian.Setting(containerEl).setName("Exclude Existing Tags").setDesc("Do not generate tags that already exist in the note").addToggle((toggle) => toggle.setValue(this.plugin.settings.excludeExistingTags).onChange(async (value) => {
+    new import_obsidian2.Setting(containerEl).setName(i18n.t("settings.excludeExisting")).setDesc(i18n.t("settings.excludeExisting.desc")).addToggle((toggle) => toggle.setValue(this.plugin.settings.excludeExistingTags).onChange(async (value) => {
       this.plugin.settings.excludeExistingTags = value;
+      await this.plugin.saveSettings();
+    }));
+    new import_obsidian2.Setting(containerEl).setName(i18n.t("settings.rateLimit")).setDesc(i18n.t("settings.rateLimit.desc")).addSlider((slider) => slider.setLimits(1, 60, 1).setValue(this.plugin.settings.rateLimit).setDynamicTooltip().onChange(async (value) => {
+      this.plugin.settings.rateLimit = value;
+      await this.plugin.saveSettings();
+    }));
+    new import_obsidian2.Setting(containerEl).setName(i18n.t("settings.maxRetries")).setDesc(i18n.t("settings.maxRetries.desc")).addSlider((slider) => slider.setLimits(1, 10, 1).setValue(this.plugin.settings.maxRetries).setDynamicTooltip().onChange(async (value) => {
+      this.plugin.settings.maxRetries = value;
       await this.plugin.saveSettings();
     }));
   }

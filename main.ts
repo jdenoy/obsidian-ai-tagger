@@ -1,6 +1,7 @@
 import { App, Plugin, PluginSettingTab, Setting, TFile, Notice, Modal, MarkdownView } from 'obsidian';
 import { AIService, AIResponse } from './ai-service';
 import { AITaggerSettings, DEFAULT_SETTINGS } from './settings';
+import { i18n } from './i18n';
 
 export default class AITaggerPlugin extends Plugin {
 	settings: AITaggerSettings;
@@ -8,15 +9,16 @@ export default class AITaggerPlugin extends Plugin {
 
 	async onload() {
 		await this.loadSettings();
+		i18n.setLanguage(this.settings.language);
 		this.aiService = new AIService(this.settings);
 
-		this.addRibbonIcon('tag', 'Generate AI Tags', () => {
+		this.addRibbonIcon('tag', i18n.t('ribbon.generateTags'), () => {
 			this.generateTagsForActiveFile();
 		});
 
 		this.addCommand({
 			id: 'generate-tags-current-note',
-			name: 'Generate tags for current note',
+			name: i18n.t('command.generateTags'),
 			callback: () => {
 				this.generateTagsForActiveFile();
 			}
@@ -24,7 +26,7 @@ export default class AITaggerPlugin extends Plugin {
 
 		this.addCommand({
 			id: 'generate-tags-all-notes',
-			name: 'Generate tags for all notes',
+			name: i18n.t('command.generateTagsAll'),
 			callback: () => {
 				this.showBatchProcessingModal();
 			}
@@ -36,12 +38,12 @@ export default class AITaggerPlugin extends Plugin {
 	async generateTagsForActiveFile() {
 		const activeFile = this.app.workspace.getActiveFile();
 		if (!activeFile) {
-			new Notice('No active file');
+			new Notice(i18n.t('notice.noActiveFile'));
 			return;
 		}
 
 		if (activeFile.extension !== 'md') {
-			new Notice('Active file is not a markdown file');
+			new Notice(i18n.t('notice.notMarkdown'));
 			return;
 		}
 
@@ -49,7 +51,7 @@ export default class AITaggerPlugin extends Plugin {
 	}
 
 	async generateTagsForFile(file: TFile) {
-		const notice = new Notice('Generating tags...', 0);
+		const notice = new Notice(i18n.t('notice.generatingTags'), 0);
 		
 		try {
 			const content = await this.app.vault.read(file);
@@ -59,13 +61,13 @@ export default class AITaggerPlugin extends Plugin {
 			
 			if (response.error) {
 				notice.hide();
-				new Notice(`Error: ${response.error}`);
+				new Notice(i18n.t('notice.errorGenerating', { error: response.error }));
 				return;
 			}
 
 			if (response.tags.length === 0) {
 				notice.hide();
-				new Notice('No tags generated');
+				new Notice(i18n.t('notice.noTagsGenerated'));
 				return;
 			}
 
@@ -78,21 +80,21 @@ export default class AITaggerPlugin extends Plugin {
 
 			if (newTags.length === 0) {
 				notice.hide();
-				new Notice('No new tags to add');
+				new Notice(i18n.t('notice.noNewTags'));
 				return;
 			}
 
 			if (this.settings.autoApplyTags) {
 				await this.applyTagsToFile(file, newTags);
 				notice.hide();
-				new Notice(`Added ${newTags.length} tags: ${newTags.join(', ')}`);
+				new Notice(i18n.t('notice.tagsAdded', { count: newTags.length.toString(), tags: newTags.join(', ') }));
 			} else {
 				notice.hide();
 				this.showTagPreviewModal(file, newTags);
 			}
 		} catch (error) {
 			notice.hide();
-			new Notice(`Error generating tags: ${error.message}`);
+			new Notice(i18n.t('notice.errorGenerating', { error: error.message }));
 		}
 	}
 
@@ -155,7 +157,7 @@ export default class AITaggerPlugin extends Plugin {
 		new TagPreviewModal(this.app, file, tags, async (selectedTags) => {
 			if (selectedTags.length > 0) {
 				await this.applyTagsToFile(file, selectedTags);
-				new Notice(`Added ${selectedTags.length} tags: ${selectedTags.join(', ')}`);
+				new Notice(i18n.t('notice.tagsAdded', { count: selectedTags.length.toString(), tags: selectedTags.join(', ') }));
 			}
 		}).open();
 	}
@@ -170,7 +172,8 @@ export default class AITaggerPlugin extends Plugin {
 
 	async saveSettings() {
 		await this.saveData(this.settings);
-		this.aiService = new AIService(this.settings);
+		i18n.setLanguage(this.settings.language);
+		this.aiService.updateSettings(this.settings);
 	}
 }
 
@@ -190,8 +193,8 @@ class TagPreviewModal extends Modal {
 
 	onOpen() {
 		const { contentEl } = this;
-		contentEl.createEl('h2', { text: 'Generated Tags Preview' });
-		contentEl.createEl('p', { text: `File: ${this.file.name}` });
+		contentEl.createEl('h2', { text: i18n.t('modal.tagPreview.title') });
+		contentEl.createEl('p', { text: i18n.t('modal.tagPreview.file', { filename: this.file.name }) });
 		
 		const tagsContainer = contentEl.createDiv({ cls: 'tags-container' });
 		
@@ -211,13 +214,13 @@ class TagPreviewModal extends Modal {
 
 		const buttonContainer = contentEl.createDiv({ cls: 'modal-button-container' });
 		
-		const applyButton = buttonContainer.createEl('button', { text: 'Apply Selected Tags' });
+		const applyButton = buttonContainer.createEl('button', { text: i18n.t('modal.tagPreview.apply') });
 		applyButton.addEventListener('click', () => {
 			this.onSubmit(Array.from(this.selectedTags));
 			this.close();
 		});
 
-		const cancelButton = buttonContainer.createEl('button', { text: 'Cancel' });
+		const cancelButton = buttonContainer.createEl('button', { text: i18n.t('modal.tagPreview.cancel') });
 		cancelButton.addEventListener('click', () => {
 			this.close();
 		});
@@ -239,21 +242,21 @@ class BatchProcessingModal extends Modal {
 
 	onOpen() {
 		const { contentEl } = this;
-		contentEl.createEl('h2', { text: 'Batch Processing' });
-		contentEl.createEl('p', { text: 'This will generate tags for all markdown files in your vault.' });
+		contentEl.createEl('h2', { text: i18n.t('modal.batchProcessing.title') });
+		contentEl.createEl('p', { text: i18n.t('modal.batchProcessing.description') });
 		
 		const warningEl = contentEl.createEl('p', { cls: 'warning' });
-		warningEl.setText('⚠️ This may take a while and consume API credits. Are you sure?');
+		warningEl.setText(i18n.t('modal.batchProcessing.warning'));
 
 		const buttonContainer = contentEl.createDiv({ cls: 'modal-button-container' });
 		
-		const proceedButton = buttonContainer.createEl('button', { text: 'Proceed' });
+		const proceedButton = buttonContainer.createEl('button', { text: i18n.t('modal.batchProcessing.proceed') });
 		proceedButton.addEventListener('click', () => {
 			this.processBatch();
 			this.close();
 		});
 
-		const cancelButton = buttonContainer.createEl('button', { text: 'Cancel' });
+		const cancelButton = buttonContainer.createEl('button', { text: i18n.t('modal.batchProcessing.cancel') });
 		cancelButton.addEventListener('click', () => {
 			this.close();
 		});
@@ -261,7 +264,7 @@ class BatchProcessingModal extends Modal {
 
 	async processBatch() {
 		const files = this.app.vault.getMarkdownFiles();
-		const notice = new Notice(`Processing ${files.length} files...`, 0);
+		const notice = new Notice(i18n.t('notice.processingFiles', { count: files.length.toString() }), 0);
 		
 		let processed = 0;
 		let errors = 0;
@@ -276,12 +279,12 @@ class BatchProcessingModal extends Modal {
 			}
 			
 			if (processed % 10 === 0) {
-				notice.setMessage(`Processed ${processed}/${files.length} files...`);
+				notice.setMessage(i18n.t('notice.processedFiles', { processed: processed.toString(), total: files.length.toString() }));
 			}
 		}
 
 		notice.hide();
-		new Notice(`Batch processing complete. Processed: ${processed}, Errors: ${errors}`);
+		new Notice(i18n.t('notice.batchComplete', { processed: processed.toString(), errors: errors.toString() }));
 	}
 
 	onClose() {
@@ -302,11 +305,24 @@ class AITaggerSettingTab extends PluginSettingTab {
 		const { containerEl } = this;
 		containerEl.empty();
 
-		containerEl.createEl('h2', { text: 'AI Tagger Settings' });
+		containerEl.createEl('h2', { text: i18n.t('settings.title') });
 
 		new Setting(containerEl)
-			.setName('Default AI Provider')
-			.setDesc('Choose between OpenAI (ChatGPT) or Claude')
+			.setName(i18n.t('settings.language'))
+			.setDesc(i18n.t('settings.language.desc'))
+			.addDropdown(dropdown => dropdown
+				.addOption('en', 'English')
+				.addOption('fr', 'Français')
+				.setValue(this.plugin.settings.language)
+				.onChange(async (value: 'en' | 'fr') => {
+					this.plugin.settings.language = value;
+					await this.plugin.saveSettings();
+					this.display(); // Refresh the settings display
+				}));
+
+		new Setting(containerEl)
+			.setName(i18n.t('settings.defaultProvider'))
+			.setDesc(i18n.t('settings.defaultProvider.desc'))
 			.addDropdown(dropdown => dropdown
 				.addOption('openai', 'OpenAI (ChatGPT)')
 				.addOption('claude', 'Claude')
@@ -317,8 +333,8 @@ class AITaggerSettingTab extends PluginSettingTab {
 				}));
 
 		new Setting(containerEl)
-			.setName('OpenAI API Key')
-			.setDesc('Your OpenAI API key')
+			.setName(i18n.t('settings.openaiKey'))
+			.setDesc(i18n.t('settings.openaiKey.desc'))
 			.addText(text => text
 				.setPlaceholder('sk-...')
 				.setValue(this.plugin.settings.openaiApiKey)
@@ -328,8 +344,8 @@ class AITaggerSettingTab extends PluginSettingTab {
 				}));
 
 		new Setting(containerEl)
-			.setName('Claude API Key')
-			.setDesc('Your Anthropic Claude API key')
+			.setName(i18n.t('settings.claudeKey'))
+			.setDesc(i18n.t('settings.claudeKey.desc'))
 			.addText(text => text
 				.setPlaceholder('sk-ant-...')
 				.setValue(this.plugin.settings.claudeApiKey)
@@ -339,8 +355,8 @@ class AITaggerSettingTab extends PluginSettingTab {
 				}));
 
 		new Setting(containerEl)
-			.setName('Minimum Tags')
-			.setDesc('Minimum number of tags to generate')
+			.setName(i18n.t('settings.minTags'))
+			.setDesc(i18n.t('settings.minTags.desc'))
 			.addSlider(slider => slider
 				.setLimits(1, 10, 1)
 				.setValue(this.plugin.settings.minTags)
@@ -351,8 +367,8 @@ class AITaggerSettingTab extends PluginSettingTab {
 				}));
 
 		new Setting(containerEl)
-			.setName('Maximum Tags')
-			.setDesc('Maximum number of tags to generate')
+			.setName(i18n.t('settings.maxTags'))
+			.setDesc(i18n.t('settings.maxTags.desc'))
 			.addSlider(slider => slider
 				.setLimits(1, 10, 1)
 				.setValue(this.plugin.settings.maxTags)
@@ -363,8 +379,8 @@ class AITaggerSettingTab extends PluginSettingTab {
 				}));
 
 		new Setting(containerEl)
-			.setName('Custom Prompt')
-			.setDesc('Custom prompt to use for tag generation')
+			.setName(i18n.t('settings.customPrompt'))
+			.setDesc(i18n.t('settings.customPrompt.desc'))
 			.addTextArea(text => text
 				.setPlaceholder('Generate relevant tags...')
 				.setValue(this.plugin.settings.customPrompt)
@@ -374,8 +390,8 @@ class AITaggerSettingTab extends PluginSettingTab {
 				}));
 
 		new Setting(containerEl)
-			.setName('Auto Apply Tags')
-			.setDesc('Automatically apply generated tags without preview')
+			.setName(i18n.t('settings.autoApply'))
+			.setDesc(i18n.t('settings.autoApply.desc'))
 			.addToggle(toggle => toggle
 				.setValue(this.plugin.settings.autoApplyTags)
 				.onChange(async (value) => {
@@ -384,12 +400,36 @@ class AITaggerSettingTab extends PluginSettingTab {
 				}));
 
 		new Setting(containerEl)
-			.setName('Exclude Existing Tags')
-			.setDesc('Do not generate tags that already exist in the note')
+			.setName(i18n.t('settings.excludeExisting'))
+			.setDesc(i18n.t('settings.excludeExisting.desc'))
 			.addToggle(toggle => toggle
 				.setValue(this.plugin.settings.excludeExistingTags)
 				.onChange(async (value) => {
 					this.plugin.settings.excludeExistingTags = value;
+					await this.plugin.saveSettings();
+				}));
+
+		new Setting(containerEl)
+			.setName(i18n.t('settings.rateLimit'))
+			.setDesc(i18n.t('settings.rateLimit.desc'))
+			.addSlider(slider => slider
+				.setLimits(1, 60, 1)
+				.setValue(this.plugin.settings.rateLimit)
+				.setDynamicTooltip()
+				.onChange(async (value) => {
+					this.plugin.settings.rateLimit = value;
+					await this.plugin.saveSettings();
+				}));
+
+		new Setting(containerEl)
+			.setName(i18n.t('settings.maxRetries'))
+			.setDesc(i18n.t('settings.maxRetries.desc'))
+			.addSlider(slider => slider
+				.setLimits(1, 10, 1)
+				.setValue(this.plugin.settings.maxRetries)
+				.setDynamicTooltip()
+				.onChange(async (value) => {
+					this.plugin.settings.maxRetries = value;
 					await this.plugin.saveSettings();
 				}));
 	}

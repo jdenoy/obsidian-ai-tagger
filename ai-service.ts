@@ -1,4 +1,7 @@
 import { AITaggerSettings } from './settings';
+import { RateLimiter } from './rate-limiter';
+import { i18n } from './i18n';
+import { Notice } from 'obsidian';
 
 export interface AIResponse {
 	tags: string[];
@@ -7,22 +10,70 @@ export interface AIResponse {
 
 export class AIService {
 	private settings: AITaggerSettings;
+	private rateLimiter: RateLimiter;
 
 	constructor(settings: AITaggerSettings) {
 		this.settings = settings;
+		this.rateLimiter = new RateLimiter({ requestsPerMinute: settings.rateLimit });
+	}
+
+	updateSettings(settings: AITaggerSettings): void {
+		this.settings = settings;
+		this.rateLimiter.updateConfig({ requestsPerMinute: settings.rateLimit });
 	}
 
 	async generateTags(content: string): Promise<AIResponse> {
+		await this.rateLimiter.waitIfNeeded();
+		
 		if (this.settings.defaultProvider === 'openai') {
-			return this.generateTagsWithOpenAI(content);
+			return this.generateTagsWithRetry(content, 'openai');
 		} else {
-			return this.generateTagsWithClaude(content);
+			return this.generateTagsWithRetry(content, 'claude');
 		}
+	}
+
+	private async generateTagsWithRetry(content: string, provider: 'openai' | 'claude'): Promise<AIResponse> {
+		let lastError: string = '';
+		
+		for (let attempt = 1; attempt <= this.settings.maxRetries; attempt++) {
+			try {
+				if (attempt > 1) {
+					new Notice(i18n.t('notice.retryingRequest', { 
+						attempt: attempt.toString(), 
+						maxAttempts: this.settings.maxRetries.toString() 
+					}));
+					
+					// Exponential backoff: 1s, 2s, 4s, etc.
+					const delay = Math.pow(2, attempt - 1) * 1000;
+					await new Promise(resolve => setTimeout(resolve, delay));
+				}
+
+				if (provider === 'openai') {
+					return await this.generateTagsWithOpenAI(content);
+				} else {
+					return await this.generateTagsWithClaude(content);
+				}
+			} catch (error) {
+				lastError = error.message;
+				
+				// Don't retry for authentication errors
+				if (error.message.includes('401') || error.message.includes('403')) {
+					return { tags: [], error: lastError };
+				}
+				
+				// Don't retry for rate limit errors from the API itself
+				if (error.message.includes('429')) {
+					return { tags: [], error: i18n.t('error.rateLimitExceeded') };
+				}
+			}
+		}
+		
+		return { tags: [], error: i18n.t('error.maxRetriesReached') + ': ' + lastError };
 	}
 
 	private async generateTagsWithOpenAI(content: string): Promise<AIResponse> {
 		if (!this.settings.openaiApiKey) {
-			return { tags: [], error: 'OpenAI API key not configured' };
+			return { tags: [], error: i18n.t('error.openaiKeyMissing') };
 		}
 
 		try {
@@ -50,7 +101,7 @@ export class AIService {
 			});
 
 			if (!response.ok) {
-				throw new Error(`OpenAI API error: ${response.status}`);
+				throw new Error(i18n.t('error.openaiApi', { status: response.status.toString() }));
 			}
 
 			const data = await response.json();
@@ -59,13 +110,13 @@ export class AIService {
 			
 			return { tags };
 		} catch (error) {
-			return { tags: [], error: `OpenAI error: ${error.message}` };
+			throw new Error(i18n.t('error.openaiError', { message: error.message }));
 		}
 	}
 
 	private async generateTagsWithClaude(content: string): Promise<AIResponse> {
 		if (!this.settings.claudeApiKey) {
-			return { tags: [], error: 'Claude API key not configured' };
+			return { tags: [], error: i18n.t('error.claudeKeyMissing') };
 		}
 
 		try {
@@ -89,7 +140,7 @@ export class AIService {
 			});
 
 			if (!response.ok) {
-				throw new Error(`Claude API error: ${response.status}`);
+				throw new Error(i18n.t('error.claudeApi', { status: response.status.toString() }));
 			}
 
 			const data = await response.json();
@@ -98,7 +149,7 @@ export class AIService {
 			
 			return { tags };
 		} catch (error) {
-			return { tags: [], error: `Claude error: ${error.message}` };
+			throw new Error(i18n.t('error.claudeError', { message: error.message }));
 		}
 	}
 

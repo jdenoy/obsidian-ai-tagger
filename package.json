@@ -1,15 +1,15 @@
 {
-  "name": "smart-tagger",
-  "version": "1.0.0",
-  "description": "An Obsidian plugin that uses AI to automatically generate relevant tags for your notes",
+  "name": "obsidian-smart-tagger",
+  "version": "1.2.0",
+  "description": "An Obsidian plugin that uses AI to automatically generate and match relevant tags for your notes",
   "main": "main.js",
   "scripts": {
     "dev": "node esbuild.config.mjs",
     "build": "tsc -noEmit -skipLibCheck && node esbuild.config.mjs production",
     "version": "node version-bump.mjs && git add manifest.json versions.json"
   },
-  "keywords": ["obsidian", "plugin", "ai", "tags", "chatgpt", "claude"],
-  "author": "",
+  "keywords": ["obsidian", "plugin", "ai", "tags", "chatgpt", "claude", "smart-tagger"],
+  "author": "Johan Denoyer",
   "license": "MIT",
   "devDependencies": {
     "@types/node": "^16.11.6",

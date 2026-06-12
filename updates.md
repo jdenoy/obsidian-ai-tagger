@@ -1,5 +1,28 @@
 # Updates & Changelog
 
+## Version 1.2.2 - Code Quality & Scanner Compliance
+
+### 🔧 Fixes
+- Resolved all Obsidian plugin scanner errors and warnings
+- Replaced `fetch` with Obsidian's built-in `requestUrl` for popout window compatibility
+- Replaced `setTimeout` with `window.setTimeout` for popout window compatibility
+- Replaced `builtin-modules` npm dependency with Node's built-in `builtinModules`
+- Fixed unsafe `any` typings across `main.ts`, `ai-service.ts`, `i18n.ts`
+- Removed deprecated `setDynamicTooltip()` calls on sliders
+- Replaced raw `<h2>` heading element with `Setting.setHeading()` in settings tab
+- Added typed response interfaces for OpenAI and Claude API calls
+
+### 🔧 Modified Files
+- `manifest.json` - Added punctuation to description
+- `main.ts` - Multiple type safety and API compliance fixes
+- `ai-service.ts` - `requestUrl`, typed interfaces, `window.setTimeout`
+- `rate-limiter.ts` - `window.setTimeout`
+- `i18n.ts` - Typed `paramKey` parameter
+- `esbuild.config.mjs` - Removed `builtin-modules` dependency
+- `package.json` - Removed `builtin-modules` devDependency
+
+---
+
 ## Version 1.2.1 - Tag Sanitization Fix
 
 ### 🐛 Bug Fix

@@ -188,7 +188,7 @@ export default class SmartTaggerPlugin extends Plugin {
 	}
 
 	async loadSettings() {
-		this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
+		this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData() as Partial<SmartTaggerSettings>);
 	}
 
 	async saveSettings() {
@@ -338,7 +338,7 @@ class SmartTaggerSettingTab extends PluginSettingTab {
 				.onChange(async (value: 'en' | 'fr') => {
 					this.plugin.settings.language = value;
 					await this.plugin.saveSettings();
-					this.display(); // Refresh the settings display
+					this.display();
 				}));
 
 		new Setting(containerEl)

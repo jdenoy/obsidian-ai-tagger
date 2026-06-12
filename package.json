@@ -1,6 +1,6 @@
 {
   "name": "obsidian-smart-tagger",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "description": "An Obsidian plugin that uses AI to automatically generate and match relevant tags for your notes",
   "main": "main.js",
   "scripts": {

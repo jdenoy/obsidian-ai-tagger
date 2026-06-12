@@ -162,7 +162,7 @@ export class AIService {
 	private parseTags(tagsText: string): string[] {
 		return tagsText
 			.split(',')
-			.map(tag => tag.trim().toLowerCase())
+			.map(tag => tag.trim().toLowerCase().replace(/\s+/g, '-'))
 			.filter(tag => tag.length > 0 && tag.length <= 50)
 			.slice(0, this.settings.maxTags);
 	}

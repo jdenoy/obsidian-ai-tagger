@@ -360,7 +360,7 @@ Content: ${content.substring(0, 4e3)}`
     }
   }
   parseTags(tagsText) {
-    return tagsText.split(",").map((tag) => tag.trim().toLowerCase()).filter((tag) => tag.length > 0 && tag.length <= 50).slice(0, this.settings.maxTags);
+    return tagsText.split(",").map((tag) => tag.trim().toLowerCase().replace(/\s+/g, "-")).filter((tag) => tag.length > 0 && tag.length <= 50).slice(0, this.settings.maxTags);
   }
 };
 

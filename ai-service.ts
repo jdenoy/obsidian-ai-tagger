@@ -1,7 +1,15 @@
 import { SmartTaggerSettings } from './settings';
 import { RateLimiter } from './rate-limiter';
 import { i18n } from './i18n';
-import { Notice } from 'obsidian';
+import { Notice, requestUrl } from 'obsidian';
+
+interface OpenAIResponse {
+	choices: Array<{ message: { content: string } }>;
+}
+
+interface ClaudeResponse {
+	content: Array<{ text: string }>;
+}
 
 export interface AIResponse {
 	tags: string[];
@@ -51,7 +59,7 @@ export class AIService {
 					
 					// Exponential backoff: 1s, 2s, 4s, etc.
 					const delay = Math.pow(2, attempt - 1) * 1000;
-					await new Promise(resolve => setTimeout(resolve, delay));
+					await new Promise(resolve => window.setTimeout(resolve, delay));
 				}
 
 				if (provider === 'openai') {
@@ -60,15 +68,13 @@ export class AIService {
 					return await this.generateTagsWithClaude(content, vaultTags);
 				}
 			} catch (error) {
-				lastError = error.message;
-				
-				// Don't retry for authentication errors
-				if (error.message.includes('401') || error.message.includes('403')) {
+				lastError = error instanceof Error ? error.message : String(error);
+
+				if (lastError.includes('401') || lastError.includes('403')) {
 					return { tags: [], error: lastError };
 				}
-				
-				// Don't retry for rate limit errors from the API itself
-				if (error.message.includes('429')) {
+
+				if (lastError.includes('429')) {
 					return { tags: [], error: i18n.t('error.rateLimitExceeded') };
 				}
 			}
@@ -83,7 +89,8 @@ export class AIService {
 		}
 
 		try {
-			const response = await fetch('https://api.openai.com/v1/chat/completions', {
+			const response = await requestUrl({
+				url: 'https://api.openai.com/v1/chat/completions',
 				method: 'POST',
 				headers: {
 					'Content-Type': 'application/json',
@@ -106,17 +113,14 @@ export class AIService {
 				})
 			});
 
-			if (!response.ok) {
-				throw new Error(i18n.t('error.openaiApi', { status: response.status.toString() }));
-			}
-
-			const data = await response.json();
+			const data = response.json as OpenAIResponse;
 			const tagsText = data.choices[0].message.content.trim();
 			const tags = this.parseTags(tagsText);
-			
+
 			return { tags };
 		} catch (error) {
-			throw new Error(i18n.t('error.openaiError', { message: error.message }));
+			const message = error instanceof Error ? error.message : String(error);
+			throw new Error(i18n.t('error.openaiError', { message }));
 		}
 	}
 
@@ -126,7 +130,8 @@ export class AIService {
 		}
 
 		try {
-			const response = await fetch('https://api.anthropic.com/v1/messages', {
+			const response = await requestUrl({
+				url: 'https://api.anthropic.com/v1/messages',
 				method: 'POST',
 				headers: {
 					'Content-Type': 'application/json',
@@ -145,17 +150,14 @@ export class AIService {
 				})
 			});
 
-			if (!response.ok) {
-				throw new Error(i18n.t('error.claudeApi', { status: response.status.toString() }));
-			}
-
-			const data = await response.json();
+			const data = response.json as ClaudeResponse;
 			const tagsText = data.content[0].text.trim();
 			const tags = this.parseTags(tagsText);
-			
+
 			return { tags };
 		} catch (error) {
-			throw new Error(i18n.t('error.claudeError', { message: error.message }));
+			const message = error instanceof Error ? error.message : String(error);
+			throw new Error(i18n.t('error.claudeError', { message }));
 		}
 	}
 

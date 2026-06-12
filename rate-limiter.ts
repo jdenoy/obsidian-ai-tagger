@@ -29,7 +29,7 @@ export class RateLimiter {
       const waitTime = this.windowMs - (now - oldestRequest) + 100; // Add 100ms buffer
       
       if (waitTime > 0) {
-        await new Promise(resolve => setTimeout(resolve, waitTime));
+        await new Promise(resolve => window.setTimeout(resolve, waitTime));
         // Recursively check again after waiting
         return this.waitIfNeeded();
       }

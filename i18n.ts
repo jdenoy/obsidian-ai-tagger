@@ -180,8 +180,8 @@ export class I18n {
       return translation;
     }
     
-    return translation.replace(/\{(\w+)\}/g, (match, paramKey) => {
-      return params[paramKey]?.toString() || match;
+    return translation.replace(/\{(\w+)\}/g, (match, paramKey: string) => {
+      return params[paramKey]?.toString() ?? match;
     });
   }
 }

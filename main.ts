@@ -1,4 +1,4 @@
-import { App, Plugin, PluginSettingTab, Setting, TFile, Notice, Modal, MarkdownView } from 'obsidian';
+import { App, Plugin, PluginSettingTab, Setting, TFile, Notice, Modal } from 'obsidian';
 import { AIService, AIResponse } from './ai-service';
 import { SmartTaggerSettings, DEFAULT_SETTINGS } from './settings';
 import { i18n } from './i18n';
@@ -13,14 +13,14 @@ export default class SmartTaggerPlugin extends Plugin {
 		this.aiService = new AIService(this.settings);
 
 		this.addRibbonIcon('tag', i18n.t('ribbon.generateTags'), () => {
-			this.generateTagsForActiveFile();
+			void this.generateTagsForActiveFile();
 		});
 
 		this.addCommand({
 			id: 'generate-tags-current-note',
 			name: i18n.t('command.generateTags'),
 			callback: () => {
-				this.generateTagsForActiveFile();
+				void this.generateTagsForActiveFile();
 			}
 		});
 
@@ -99,7 +99,8 @@ export default class SmartTaggerPlugin extends Plugin {
 			}
 		} catch (error) {
 			notice.hide();
-			new Notice(i18n.t('notice.errorGenerating', { error: error.message }));
+			const message = error instanceof Error ? error.message : String(error);
+			new Notice(i18n.t('notice.errorGenerating', { error: message }));
 		}
 	}
 
@@ -128,7 +129,8 @@ export default class SmartTaggerPlugin extends Plugin {
 	}
 
 	private getVaultTags(): string[] {
-		const tagCounts = (this.app.metadataCache as any).getTags() as Record<string, number>;
+		const cache = this.app.metadataCache as unknown as { getTags(): Record<string, number> };
+		const tagCounts = cache.getTags();
 		return Object.keys(tagCounts).map(t => t.startsWith('#') ? t.slice(1) : t);
 	}
 
@@ -172,10 +174,11 @@ export default class SmartTaggerPlugin extends Plugin {
 	}
 
 	private showTagPreviewModal(file: TFile, tags: string[]) {
-		new TagPreviewModal(this.app, file, tags, async (selectedTags) => {
+		new TagPreviewModal(this.app, file, tags, (selectedTags) => {
 			if (selectedTags.length > 0) {
-				await this.applyTagsToFile(file, selectedTags);
-				new Notice(i18n.t('notice.tagsAdded', { count: selectedTags.length.toString(), tags: selectedTags.join(', ') }));
+				void this.applyTagsToFile(file, selectedTags).then(() => {
+					new Notice(i18n.t('notice.tagsAdded', { count: selectedTags.length.toString(), tags: selectedTags.join(', ') }));
+				});
 			}
 		}).open();
 	}
@@ -270,7 +273,7 @@ class BatchProcessingModal extends Modal {
 		
 		const proceedButton = buttonContainer.createEl('button', { text: i18n.t('modal.batchProcessing.proceed') });
 		proceedButton.addEventListener('click', () => {
-			this.processBatch();
+			void this.processBatch();
 			this.close();
 		});
 
@@ -323,7 +326,7 @@ class SmartTaggerSettingTab extends PluginSettingTab {
 		const { containerEl } = this;
 		containerEl.empty();
 
-		containerEl.createEl('h2', { text: i18n.t('settings.title') });
+		new Setting(containerEl).setName(i18n.t('settings.title')).setHeading();
 
 		new Setting(containerEl)
 			.setName(i18n.t('settings.language'))
@@ -378,7 +381,6 @@ class SmartTaggerSettingTab extends PluginSettingTab {
 			.addSlider(slider => slider
 				.setLimits(1, 10, 1)
 				.setValue(this.plugin.settings.minTags)
-				.setDynamicTooltip()
 				.onChange(async (value) => {
 					this.plugin.settings.minTags = value;
 					await this.plugin.saveSettings();
@@ -390,7 +392,6 @@ class SmartTaggerSettingTab extends PluginSettingTab {
 			.addSlider(slider => slider
 				.setLimits(1, 10, 1)
 				.setValue(this.plugin.settings.maxTags)
-				.setDynamicTooltip()
 				.onChange(async (value) => {
 					this.plugin.settings.maxTags = value;
 					await this.plugin.saveSettings();
@@ -443,7 +444,6 @@ class SmartTaggerSettingTab extends PluginSettingTab {
 			.addSlider(slider => slider
 				.setLimits(1, 60, 1)
 				.setValue(this.plugin.settings.rateLimit)
-				.setDynamicTooltip()
 				.onChange(async (value) => {
 					this.plugin.settings.rateLimit = value;
 					await this.plugin.saveSettings();
@@ -455,7 +455,6 @@ class SmartTaggerSettingTab extends PluginSettingTab {
 			.addSlider(slider => slider
 				.setLimits(1, 10, 1)
 				.setValue(this.plugin.settings.maxRetries)
-				.setDynamicTooltip()
 				.onChange(async (value) => {
 					this.plugin.settings.maxRetries = value;
 					await this.plugin.saveSettings();

@@ -48,7 +48,7 @@ var RateLimiter = class {
       const oldestRequest = Math.min(...this.requests);
       const waitTime = this.windowMs - (now - oldestRequest) + 100;
       if (waitTime > 0) {
-        await new Promise((resolve) => setTimeout(resolve, waitTime));
+        await new Promise((resolve) => window.setTimeout(resolve, waitTime));
         return this.waitIfNeeded();
       }
     }
@@ -225,8 +225,8 @@ var I18n = class {
       return translation;
     }
     return translation.replace(/\{(\w+)\}/g, (match, paramKey) => {
-      var _a;
-      return ((_a = params[paramKey]) == null ? void 0 : _a.toString()) || match;
+      var _a, _b;
+      return (_b = (_a = params[paramKey]) == null ? void 0 : _a.toString()) != null ? _b : match;
     });
   }
 };
@@ -266,7 +266,7 @@ var AIService = class {
             maxAttempts: this.settings.maxRetries.toString()
           }));
           const delay = Math.pow(2, attempt - 1) * 1e3;
-          await new Promise((resolve) => setTimeout(resolve, delay));
+          await new Promise((resolve) => window.setTimeout(resolve, delay));
         }
         if (provider === "openai") {
           return await this.generateTagsWithOpenAI(content, vaultTags);
@@ -274,11 +274,11 @@ var AIService = class {
           return await this.generateTagsWithClaude(content, vaultTags);
         }
       } catch (error) {
-        lastError = error.message;
-        if (error.message.includes("401") || error.message.includes("403")) {
+        lastError = error instanceof Error ? error.message : String(error);
+        if (lastError.includes("401") || lastError.includes("403")) {
           return { tags: [], error: lastError };
         }
-        if (error.message.includes("429")) {
+        if (lastError.includes("429")) {
           return { tags: [], error: i18n.t("error.rateLimitExceeded") };
         }
       }
@@ -290,7 +290,8 @@ var AIService = class {
       return { tags: [], error: i18n.t("error.openaiKeyMissing") };
     }
     try {
-      const response = await fetch("https://api.openai.com/v1/chat/completions", {
+      const response = await (0, import_obsidian.requestUrl)({
+        url: "https://api.openai.com/v1/chat/completions",
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -312,15 +313,13 @@ var AIService = class {
           temperature: 0.3
         })
       });
-      if (!response.ok) {
-        throw new Error(i18n.t("error.openaiApi", { status: response.status.toString() }));
-      }
-      const data = await response.json();
+      const data = response.json;
       const tagsText = data.choices[0].message.content.trim();
       const tags = this.parseTags(tagsText);
       return { tags };
     } catch (error) {
-      throw new Error(i18n.t("error.openaiError", { message: error.message }));
+      const message = error instanceof Error ? error.message : String(error);
+      throw new Error(i18n.t("error.openaiError", { message }));
     }
   }
   async generateTagsWithClaude(content, vaultTags) {
@@ -328,7 +327,8 @@ var AIService = class {
       return { tags: [], error: i18n.t("error.claudeKeyMissing") };
     }
     try {
-      const response = await fetch("https://api.anthropic.com/v1/messages", {
+      const response = await (0, import_obsidian.requestUrl)({
+        url: "https://api.anthropic.com/v1/messages",
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -348,15 +348,13 @@ Content: ${content.substring(0, 4e3)}`
           ]
         })
       });
-      if (!response.ok) {
-        throw new Error(i18n.t("error.claudeApi", { status: response.status.toString() }));
-      }
-      const data = await response.json();
+      const data = response.json;
       const tagsText = data.content[0].text.trim();
       const tags = this.parseTags(tagsText);
       return { tags };
     } catch (error) {
-      throw new Error(i18n.t("error.claudeError", { message: error.message }));
+      const message = error instanceof Error ? error.message : String(error);
+      throw new Error(i18n.t("error.claudeError", { message }));
     }
   }
   parseTags(tagsText) {
@@ -388,13 +386,13 @@ var SmartTaggerPlugin = class extends import_obsidian2.Plugin {
     i18n.setLanguage(this.settings.language);
     this.aiService = new AIService(this.settings);
     this.addRibbonIcon("tag", i18n.t("ribbon.generateTags"), () => {
-      this.generateTagsForActiveFile();
+      void this.generateTagsForActiveFile();
     });
     this.addCommand({
       id: "generate-tags-current-note",
       name: i18n.t("command.generateTags"),
       callback: () => {
-        this.generateTagsForActiveFile();
+        void this.generateTagsForActiveFile();
       }
     });
     this.addCommand({
@@ -458,7 +456,8 @@ var SmartTaggerPlugin = class extends import_obsidian2.Plugin {
       }
     } catch (error) {
       notice.hide();
-      new import_obsidian2.Notice(i18n.t("notice.errorGenerating", { error: error.message }));
+      const message = error instanceof Error ? error.message : String(error);
+      new import_obsidian2.Notice(i18n.t("notice.errorGenerating", { error: message }));
     }
   }
   removeYamlFrontmatter(content) {
@@ -478,7 +477,8 @@ var SmartTaggerPlugin = class extends import_obsidian2.Plugin {
     }
   }
   getVaultTags() {
-    const tagCounts = this.app.metadataCache.getTags();
+    const cache = this.app.metadataCache;
+    const tagCounts = cache.getTags();
     return Object.keys(tagCounts).map((t) => t.startsWith("#") ? t.slice(1) : t);
   }
   matchToVaultTags(aiTags, vaultTags) {
@@ -524,10 +524,11 @@ ${content}`;
     }
   }
   showTagPreviewModal(file, tags) {
-    new TagPreviewModal(this.app, file, tags, async (selectedTags) => {
+    new TagPreviewModal(this.app, file, tags, (selectedTags) => {
       if (selectedTags.length > 0) {
-        await this.applyTagsToFile(file, selectedTags);
-        new import_obsidian2.Notice(i18n.t("notice.tagsAdded", { count: selectedTags.length.toString(), tags: selectedTags.join(", ") }));
+        void this.applyTagsToFile(file, selectedTags).then(() => {
+          new import_obsidian2.Notice(i18n.t("notice.tagsAdded", { count: selectedTags.length.toString(), tags: selectedTags.join(", ") }));
+        });
       }
     }).open();
   }
@@ -599,7 +600,7 @@ var BatchProcessingModal = class extends import_obsidian2.Modal {
     const buttonContainer = contentEl.createDiv({ cls: "modal-button-container" });
     const proceedButton = buttonContainer.createEl("button", { text: i18n.t("modal.batchProcessing.proceed") });
     proceedButton.addEventListener("click", () => {
-      this.processBatch();
+      void this.processBatch();
       this.close();
     });
     const cancelButton = buttonContainer.createEl("button", { text: i18n.t("modal.batchProcessing.cancel") });
@@ -640,7 +641,7 @@ var SmartTaggerSettingTab = class extends import_obsidian2.PluginSettingTab {
   display() {
     const { containerEl } = this;
     containerEl.empty();
-    containerEl.createEl("h2", { text: i18n.t("settings.title") });
+    new import_obsidian2.Setting(containerEl).setName(i18n.t("settings.title")).setHeading();
     new import_obsidian2.Setting(containerEl).setName(i18n.t("settings.language")).setDesc(i18n.t("settings.language.desc")).addDropdown((dropdown) => dropdown.addOption("en", "English").addOption("fr", "Fran\xE7ais").setValue(this.plugin.settings.language).onChange(async (value) => {
       this.plugin.settings.language = value;
       await this.plugin.saveSettings();
@@ -658,11 +659,11 @@ var SmartTaggerSettingTab = class extends import_obsidian2.PluginSettingTab {
       this.plugin.settings.claudeApiKey = value;
       await this.plugin.saveSettings();
     }));
-    new import_obsidian2.Setting(containerEl).setName(i18n.t("settings.minTags")).setDesc(i18n.t("settings.minTags.desc")).addSlider((slider) => slider.setLimits(1, 10, 1).setValue(this.plugin.settings.minTags).setDynamicTooltip().onChange(async (value) => {
+    new import_obsidian2.Setting(containerEl).setName(i18n.t("settings.minTags")).setDesc(i18n.t("settings.minTags.desc")).addSlider((slider) => slider.setLimits(1, 10, 1).setValue(this.plugin.settings.minTags).onChange(async (value) => {
       this.plugin.settings.minTags = value;
       await this.plugin.saveSettings();
     }));
-    new import_obsidian2.Setting(containerEl).setName(i18n.t("settings.maxTags")).setDesc(i18n.t("settings.maxTags.desc")).addSlider((slider) => slider.setLimits(1, 10, 1).setValue(this.plugin.settings.maxTags).setDynamicTooltip().onChange(async (value) => {
+    new import_obsidian2.Setting(containerEl).setName(i18n.t("settings.maxTags")).setDesc(i18n.t("settings.maxTags.desc")).addSlider((slider) => slider.setLimits(1, 10, 1).setValue(this.plugin.settings.maxTags).onChange(async (value) => {
       this.plugin.settings.maxTags = value;
       await this.plugin.saveSettings();
     }));
@@ -682,11 +683,11 @@ var SmartTaggerSettingTab = class extends import_obsidian2.PluginSettingTab {
       this.plugin.settings.preferVaultTags = value;
       await this.plugin.saveSettings();
     }));
-    new import_obsidian2.Setting(containerEl).setName(i18n.t("settings.rateLimit")).setDesc(i18n.t("settings.rateLimit.desc")).addSlider((slider) => slider.setLimits(1, 60, 1).setValue(this.plugin.settings.rateLimit).setDynamicTooltip().onChange(async (value) => {
+    new import_obsidian2.Setting(containerEl).setName(i18n.t("settings.rateLimit")).setDesc(i18n.t("settings.rateLimit.desc")).addSlider((slider) => slider.setLimits(1, 60, 1).setValue(this.plugin.settings.rateLimit).onChange(async (value) => {
       this.plugin.settings.rateLimit = value;
       await this.plugin.saveSettings();
     }));
-    new import_obsidian2.Setting(containerEl).setName(i18n.t("settings.maxRetries")).setDesc(i18n.t("settings.maxRetries.desc")).addSlider((slider) => slider.setLimits(1, 10, 1).setValue(this.plugin.settings.maxRetries).setDynamicTooltip().onChange(async (value) => {
+    new import_obsidian2.Setting(containerEl).setName(i18n.t("settings.maxRetries")).setDesc(i18n.t("settings.maxRetries.desc")).addSlider((slider) => slider.setLimits(1, 10, 1).setValue(this.plugin.settings.maxRetries).onChange(async (value) => {
       this.plugin.settings.maxRetries = value;
       await this.plugin.saveSettings();
     }));

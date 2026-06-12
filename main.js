@@ -24,7 +24,7 @@ var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: tru
 // main.ts
 var main_exports = {};
 __export(main_exports, {
-  default: () => AITaggerPlugin
+  default: () => SmartTaggerPlugin
 });
 module.exports = __toCommonJS(main_exports);
 var import_obsidian2 = require("obsidian");
@@ -73,7 +73,7 @@ var RateLimiter = class {
 var translations = {
   en: {
     // Plugin general
-    "plugin.name": "AI Tagger",
+    "plugin.name": "Smart Tagger",
     "plugin.description": "Automatically generate relevant tags for your notes using AI",
     // Commands
     "command.generateTags": "Generate tags for current note",
@@ -94,7 +94,7 @@ var translations = {
     "notice.rateLimitHit": "Rate limit reached. Waiting {seconds} seconds...",
     "notice.retryingRequest": "Request failed, retrying ({attempt}/{maxAttempts})...",
     // Settings
-    "settings.title": "AI Tagger Settings",
+    "settings.title": "Smart Tagger Settings",
     "settings.language": "Language",
     "settings.language.desc": "Choose interface language",
     "settings.defaultProvider": "Default AI Provider",
@@ -141,7 +141,7 @@ var translations = {
   },
   fr: {
     // Plugin général
-    "plugin.name": "AI Tagger",
+    "plugin.name": "Smart Tagger",
     "plugin.description": "G\xE9n\xE8re automatiquement des tags pertinents pour vos notes avec l'IA",
     // Commandes
     "command.generateTags": "G\xE9n\xE9rer des tags pour la note actuelle",
@@ -162,7 +162,7 @@ var translations = {
     "notice.rateLimitHit": "Limite de d\xE9bit atteinte. Attente de {seconds} secondes...",
     "notice.retryingRequest": "\xC9chec de la requ\xEAte, nouvelle tentative ({attempt}/{maxAttempts})...",
     // Paramètres
-    "settings.title": "Param\xE8tres AI Tagger",
+    "settings.title": "Param\xE8tres Smart Tagger",
     "settings.language": "Langue",
     "settings.language.desc": "Choisir la langue de l'interface",
     "settings.defaultProvider": "Fournisseur IA par d\xE9faut",
@@ -382,7 +382,7 @@ var DEFAULT_SETTINGS = {
 };
 
 // main.ts
-var AITaggerPlugin = class extends import_obsidian2.Plugin {
+var SmartTaggerPlugin = class extends import_obsidian2.Plugin {
   async onload() {
     await this.loadSettings();
     i18n.setLanguage(this.settings.language);
@@ -404,7 +404,7 @@ var AITaggerPlugin = class extends import_obsidian2.Plugin {
         this.showBatchProcessingModal();
       }
     });
-    this.addSettingTab(new AITaggerSettingTab(this.app, this));
+    this.addSettingTab(new SmartTaggerSettingTab(this.app, this));
   }
   async generateTagsForActiveFile() {
     const activeFile = this.app.workspace.getActiveFile();
@@ -632,7 +632,7 @@ var BatchProcessingModal = class extends import_obsidian2.Modal {
     contentEl.empty();
   }
 };
-var AITaggerSettingTab = class extends import_obsidian2.PluginSettingTab {
+var SmartTaggerSettingTab = class extends import_obsidian2.PluginSettingTab {
   constructor(app, plugin) {
     super(app, plugin);
     this.plugin = plugin;

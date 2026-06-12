@@ -1,10 +1,10 @@
 import { App, Plugin, PluginSettingTab, Setting, TFile, Notice, Modal, MarkdownView } from 'obsidian';
 import { AIService, AIResponse } from './ai-service';
-import { AITaggerSettings, DEFAULT_SETTINGS } from './settings';
+import { SmartTaggerSettings, DEFAULT_SETTINGS } from './settings';
 import { i18n } from './i18n';
 
-export default class AITaggerPlugin extends Plugin {
-	settings: AITaggerSettings;
+export default class SmartTaggerPlugin extends Plugin {
+	settings: SmartTaggerSettings;
 	aiService: AIService;
 
 	async onload() {
@@ -32,7 +32,7 @@ export default class AITaggerPlugin extends Plugin {
 			}
 		});
 
-		this.addSettingTab(new AITaggerSettingTab(this.app, this));
+		this.addSettingTab(new SmartTaggerSettingTab(this.app, this));
 	}
 
 	async generateTagsForActiveFile() {
@@ -251,9 +251,9 @@ class TagPreviewModal extends Modal {
 }
 
 class BatchProcessingModal extends Modal {
-	plugin: AITaggerPlugin;
+	plugin: SmartTaggerPlugin;
 
-	constructor(app: App, plugin: AITaggerPlugin) {
+	constructor(app: App, plugin: SmartTaggerPlugin) {
 		super(app);
 		this.plugin = plugin;
 	}
@@ -311,10 +311,10 @@ class BatchProcessingModal extends Modal {
 	}
 }
 
-class AITaggerSettingTab extends PluginSettingTab {
-	plugin: AITaggerPlugin;
+class SmartTaggerSettingTab extends PluginSettingTab {
+	plugin: SmartTaggerPlugin;
 
-	constructor(app: App, plugin: AITaggerPlugin) {
+	constructor(app: App, plugin: SmartTaggerPlugin) {
 		super(app, plugin);
 		this.plugin = plugin;
 	}

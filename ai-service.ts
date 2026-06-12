@@ -1,4 +1,4 @@
-import { AITaggerSettings } from './settings';
+import { SmartTaggerSettings } from './settings';
 import { RateLimiter } from './rate-limiter';
 import { i18n } from './i18n';
 import { Notice } from 'obsidian';
@@ -9,15 +9,15 @@ export interface AIResponse {
 }
 
 export class AIService {
-	private settings: AITaggerSettings;
+	private settings: SmartTaggerSettings;
 	private rateLimiter: RateLimiter;
 
-	constructor(settings: AITaggerSettings) {
+	constructor(settings: SmartTaggerSettings) {
 		this.settings = settings;
 		this.rateLimiter = new RateLimiter({ requestsPerMinute: settings.rateLimit });
 	}
 
-	updateSettings(settings: AITaggerSettings): void {
+	updateSettings(settings: SmartTaggerSettings): void {
 		this.settings = settings;
 		this.rateLimiter.updateConfig({ requestsPerMinute: settings.rateLimit });
 	}

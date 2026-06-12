@@ -1,4 +1,4 @@
-# AI Tagger for Obsidian
+# Smart Tagger for Obsidian
 
 An Obsidian plugin that automatically generates 2-5 relevant tags for your notes using AI (ChatGPT or Claude).
 
@@ -32,7 +32,7 @@ An Obsidian plugin that automatically generates 2-5 relevant tags for your notes
 
 ## Setup
 
-1. Go to Settings → Community Plugins → AI Tagger
+1. Go to Settings → Community Plugins → Smart Tagger
 2. Choose your preferred AI provider (OpenAI or Claude)
 3. Add your API key:
    - **OpenAI**: Get your API key from [OpenAI's platform](https://platform.openai.com/api-keys)

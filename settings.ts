@@ -1,6 +1,6 @@
 import { Language } from './i18n';
 
-export interface AITaggerSettings {
+export interface SmartTaggerSettings {
 	openaiApiKey: string;
 	claudeApiKey: string;
 	defaultProvider: 'openai' | 'claude';
@@ -16,7 +16,7 @@ export interface AITaggerSettings {
 	preferVaultTags: boolean;
 }
 
-export const DEFAULT_SETTINGS: AITaggerSettings = {
+export const DEFAULT_SETTINGS: SmartTaggerSettings = {
 	openaiApiKey: '',
 	claudeApiKey: '',
 	defaultProvider: 'openai',

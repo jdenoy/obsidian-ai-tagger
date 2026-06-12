@@ -7,7 +7,7 @@ export interface Translations {
 const translations: Record<Language, Translations> = {
   en: {
     // Plugin general
-    'plugin.name': 'AI Tagger',
+    'plugin.name': 'Smart Tagger',
     'plugin.description': 'Automatically generate relevant tags for your notes using AI',
     
     // Commands
@@ -32,7 +32,7 @@ const translations: Record<Language, Translations> = {
     'notice.retryingRequest': 'Request failed, retrying ({attempt}/{maxAttempts})...',
     
     // Settings
-    'settings.title': 'AI Tagger Settings',
+    'settings.title': 'Smart Tagger Settings',
     'settings.language': 'Language',
     'settings.language.desc': 'Choose interface language',
     'settings.defaultProvider': 'Default AI Provider',
@@ -83,7 +83,7 @@ const translations: Record<Language, Translations> = {
   
   fr: {
     // Plugin général
-    'plugin.name': 'AI Tagger',
+    'plugin.name': 'Smart Tagger',
     'plugin.description': 'Génère automatiquement des tags pertinents pour vos notes avec l\'IA',
     
     // Commandes
@@ -108,7 +108,7 @@ const translations: Record<Language, Translations> = {
     'notice.retryingRequest': 'Échec de la requête, nouvelle tentative ({attempt}/{maxAttempts})...',
     
     // Paramètres
-    'settings.title': 'Paramètres AI Tagger',
+    'settings.title': 'Paramètres Smart Tagger',
     'settings.language': 'Langue',
     'settings.language.desc': 'Choisir la langue de l\'interface',
     'settings.defaultProvider': 'Fournisseur IA par défaut',

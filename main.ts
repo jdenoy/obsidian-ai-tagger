@@ -57,8 +57,13 @@ export default class AITaggerPlugin extends Plugin {
 			const content = await this.app.vault.read(file);
 			const contentWithoutFrontmatter = this.removeYamlFrontmatter(content);
 			
-			const response: AIResponse = await this.aiService.generateTags(contentWithoutFrontmatter);
-			
+			const vaultTags = this.settings.preferVaultTags ? this.getVaultTags() : undefined;
+			const response: AIResponse = await this.aiService.generateTags(contentWithoutFrontmatter, vaultTags);
+
+			if (vaultTags && response.tags.length > 0) {
+				response.tags = this.matchToVaultTags(response.tags, vaultTags);
+			}
+
 			if (response.error) {
 				notice.hide();
 				new Notice(i18n.t('notice.errorGenerating', { error: response.error }));
@@ -75,7 +80,7 @@ export default class AITaggerPlugin extends Plugin {
 			let newTags = response.tags;
 
 			if (this.settings.excludeExistingTags) {
-				newTags = response.tags.filter(tag => !existingTags.includes(tag));
+				newTags = newTags.filter(tag => !existingTags.includes(tag));
 			}
 
 			if (newTags.length === 0) {
@@ -120,6 +125,19 @@ export default class AITaggerPlugin extends Plugin {
 				.map(line => line.trim().replace(/^-\s*/, '').replace(/['"]/g, ''))
 				.filter(tag => tag.length > 0);
 		}
+	}
+
+	private getVaultTags(): string[] {
+		const tagCounts = (this.app.metadataCache as any).getTags() as Record<string, number>;
+		return Object.keys(tagCounts).map(t => t.startsWith('#') ? t.slice(1) : t);
+	}
+
+	private matchToVaultTags(aiTags: string[], vaultTags: string[]): string[] {
+		const lowerMap = new Map<string, string>();
+		for (const vt of vaultTags) {
+			lowerMap.set(vt.toLowerCase(), vt);
+		}
+		return aiTags.map(tag => lowerMap.get(tag.toLowerCase()) ?? tag);
 	}
 
 	private async applyTagsToFile(file: TFile, tags: string[]) {
@@ -406,6 +424,16 @@ class AITaggerSettingTab extends PluginSettingTab {
 				.setValue(this.plugin.settings.excludeExistingTags)
 				.onChange(async (value) => {
 					this.plugin.settings.excludeExistingTags = value;
+					await this.plugin.saveSettings();
+				}));
+
+		new Setting(containerEl)
+			.setName(i18n.t('settings.preferVaultTags'))
+			.setDesc(i18n.t('settings.preferVaultTags.desc'))
+			.addToggle(toggle => toggle
+				.setValue(this.plugin.settings.preferVaultTags)
+				.onChange(async (value) => {
+					this.plugin.settings.preferVaultTags = value;
 					await this.plugin.saveSettings();
 				}));
 

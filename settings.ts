@@ -13,6 +13,7 @@ export interface AITaggerSettings {
 	language: Language;
 	rateLimit: number;
 	maxRetries: number;
+	preferVaultTags: boolean;
 }
 
 export const DEFAULT_SETTINGS: AITaggerSettings = {
@@ -27,5 +28,6 @@ export const DEFAULT_SETTINGS: AITaggerSettings = {
 	excludeExistingTags: true,
 	language: 'en',
 	rateLimit: 10,
-	maxRetries: 3
+	maxRetries: 3,
+	preferVaultTags: true
 };

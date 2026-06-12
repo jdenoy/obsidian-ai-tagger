@@ -22,17 +22,23 @@ export class AIService {
 		this.rateLimiter.updateConfig({ requestsPerMinute: settings.rateLimit });
 	}
 
-	async generateTags(content: string): Promise<AIResponse> {
+	async generateTags(content: string, vaultTags?: string[]): Promise<AIResponse> {
 		await this.rateLimiter.waitIfNeeded();
-		
+
 		if (this.settings.defaultProvider === 'openai') {
-			return this.generateTagsWithRetry(content, 'openai');
+			return this.generateTagsWithRetry(content, 'openai', vaultTags);
 		} else {
-			return this.generateTagsWithRetry(content, 'claude');
+			return this.generateTagsWithRetry(content, 'claude', vaultTags);
 		}
 	}
 
-	private async generateTagsWithRetry(content: string, provider: 'openai' | 'claude'): Promise<AIResponse> {
+	private buildVaultTagsInstruction(vaultTags?: string[]): string {
+		if (!vaultTags || vaultTags.length === 0) return '';
+		const tagList = vaultTags.slice(0, 150).join(', ');
+		return ` You have access to these existing vault tags: [${tagList}]. Prefer using existing tags when they fit the content. Only generate new tags when no existing tag is appropriate.`;
+	}
+
+	private async generateTagsWithRetry(content: string, provider: 'openai' | 'claude', vaultTags?: string[]): Promise<AIResponse> {
 		let lastError: string = '';
 		
 		for (let attempt = 1; attempt <= this.settings.maxRetries; attempt++) {
@@ -49,9 +55,9 @@ export class AIService {
 				}
 
 				if (provider === 'openai') {
-					return await this.generateTagsWithOpenAI(content);
+					return await this.generateTagsWithOpenAI(content, vaultTags);
 				} else {
-					return await this.generateTagsWithClaude(content);
+					return await this.generateTagsWithClaude(content, vaultTags);
 				}
 			} catch (error) {
 				lastError = error.message;
@@ -71,7 +77,7 @@ export class AIService {
 		return { tags: [], error: i18n.t('error.maxRetriesReached') + ': ' + lastError };
 	}
 
-	private async generateTagsWithOpenAI(content: string): Promise<AIResponse> {
+	private async generateTagsWithOpenAI(content: string, vaultTags?: string[]): Promise<AIResponse> {
 		if (!this.settings.openaiApiKey) {
 			return { tags: [], error: i18n.t('error.openaiKeyMissing') };
 		}
@@ -88,7 +94,7 @@ export class AIService {
 					messages: [
 						{
 							role: 'system',
-							content: `${this.settings.customPrompt} Generate between ${this.settings.minTags} and ${this.settings.maxTags} tags. Return only the tags as a comma-separated list, no other text.`
+							content: `${this.settings.customPrompt}${this.buildVaultTagsInstruction(vaultTags)} Generate between ${this.settings.minTags} and ${this.settings.maxTags} tags. Return only the tags as a comma-separated list, no other text.`
 						},
 						{
 							role: 'user',
@@ -114,7 +120,7 @@ export class AIService {
 		}
 	}
 
-	private async generateTagsWithClaude(content: string): Promise<AIResponse> {
+	private async generateTagsWithClaude(content: string, vaultTags?: string[]): Promise<AIResponse> {
 		if (!this.settings.claudeApiKey) {
 			return { tags: [], error: i18n.t('error.claudeKeyMissing') };
 		}
@@ -133,7 +139,7 @@ export class AIService {
 					messages: [
 						{
 							role: 'user',
-							content: `${this.settings.customPrompt} Generate between ${this.settings.minTags} and ${this.settings.maxTags} tags for this content. Return only the tags as a comma-separated list, no other text.\n\nContent: ${content.substring(0, 4000)}`
+							content: `${this.settings.customPrompt}${this.buildVaultTagsInstruction(vaultTags)} Generate between ${this.settings.minTags} and ${this.settings.maxTags} tags for this content. Return only the tags as a comma-separated list, no other text.\n\nContent: ${content.substring(0, 4000)}`
 						}
 					]
 				})

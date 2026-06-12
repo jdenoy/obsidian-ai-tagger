@@ -1,5 +1,22 @@
 # Updates & Changelog
 
+## Version 1.2.0 - Vault Tag Matching
+
+### 🏷 Vault Tag Awareness
+- **Prefer Existing Vault Tags**: AI-generated tags are matched against all tags in your vault before being applied
+- **Case-insensitive Matching**: If AI generates `machine-learning` and your vault has `Machine-Learning`, the vault's casing wins
+- **Unmatched Tags Pass Through**: Tags with no vault match are applied as-is from the AI
+- **Two-layer approach**: Vault tags are sent to the AI as context (prompt-level preference), then AI output is post-processed with a deterministic case-insensitive lookup against vault tags
+- **Toggleable**: New setting "Prefer Existing Vault Tags" (default: enabled) controls this behavior
+
+### 🔧 Modified Files
+- `settings.ts` - Added `preferVaultTags` property
+- `i18n.ts` - Added EN/FR translations for new setting
+- `main.ts` - Added `getVaultTags()`, `matchToVaultTags()`, and settings UI toggle
+- `ai-service.ts` - Added `buildVaultTagsInstruction()`, updated all generate methods to accept `vaultTags`
+
+---
+
 ## Version 1.1.0 - Multi-language Support & Enhanced API Management
 
 ### 🌍 Multi-language Support

@@ -117,6 +117,8 @@ var translations = {
     "settings.rateLimit.desc": "Maximum API requests per minute",
     "settings.maxRetries": "Max Retries",
     "settings.maxRetries.desc": "Maximum retry attempts for failed API calls",
+    "settings.preferVaultTags": "Prefer Existing Vault Tags",
+    "settings.preferVaultTags.desc": "When an AI-generated tag matches an existing vault tag (case-insensitive), use the vault tag's exact name instead",
     // Modals
     "modal.tagPreview.title": "Generated Tags Preview",
     "modal.tagPreview.file": "File: {filename}",
@@ -183,6 +185,8 @@ var translations = {
     "settings.rateLimit.desc": "Nombre maximum de requ\xEAtes API par minute",
     "settings.maxRetries": "Tentatives maximum",
     "settings.maxRetries.desc": "Nombre maximum de tentatives pour les appels API \xE9chou\xE9s",
+    "settings.preferVaultTags": "Privil\xE9gier les tags existants du coffre",
+    "settings.preferVaultTags.desc": "Si un tag g\xE9n\xE9r\xE9 par l'IA correspond \xE0 un tag existant (insensible \xE0 la casse), utiliser le nom exact du tag du coffre",
     // Modales
     "modal.tagPreview.title": "Aper\xE7u des tags g\xE9n\xE9r\xE9s",
     "modal.tagPreview.file": "Fichier : {filename}",
@@ -239,15 +243,20 @@ var AIService = class {
     this.settings = settings;
     this.rateLimiter.updateConfig({ requestsPerMinute: settings.rateLimit });
   }
-  async generateTags(content) {
+  async generateTags(content, vaultTags) {
     await this.rateLimiter.waitIfNeeded();
     if (this.settings.defaultProvider === "openai") {
-      return this.generateTagsWithRetry(content, "openai");
+      return this.generateTagsWithRetry(content, "openai", vaultTags);
     } else {
-      return this.generateTagsWithRetry(content, "claude");
+      return this.generateTagsWithRetry(content, "claude", vaultTags);
     }
   }
-  async generateTagsWithRetry(content, provider) {
+  buildVaultTagsInstruction(vaultTags) {
+    if (!vaultTags || vaultTags.length === 0) return "";
+    const tagList = vaultTags.slice(0, 150).join(", ");
+    return ` You have access to these existing vault tags: [${tagList}]. Prefer using existing tags when they fit the content. Only generate new tags when no existing tag is appropriate.`;
+  }
+  async generateTagsWithRetry(content, provider, vaultTags) {
     let lastError = "";
     for (let attempt = 1; attempt <= this.settings.maxRetries; attempt++) {
       try {
@@ -260,9 +269,9 @@ var AIService = class {
           await new Promise((resolve) => setTimeout(resolve, delay));
         }
         if (provider === "openai") {
-          return await this.generateTagsWithOpenAI(content);
+          return await this.generateTagsWithOpenAI(content, vaultTags);
         } else {
-          return await this.generateTagsWithClaude(content);
+          return await this.generateTagsWithClaude(content, vaultTags);
         }
       } catch (error) {
         lastError = error.message;
@@ -276,7 +285,7 @@ var AIService = class {
     }
     return { tags: [], error: i18n.t("error.maxRetriesReached") + ": " + lastError };
   }
-  async generateTagsWithOpenAI(content) {
+  async generateTagsWithOpenAI(content, vaultTags) {
     if (!this.settings.openaiApiKey) {
       return { tags: [], error: i18n.t("error.openaiKeyMissing") };
     }
@@ -292,7 +301,7 @@ var AIService = class {
           messages: [
             {
               role: "system",
-              content: `${this.settings.customPrompt} Generate between ${this.settings.minTags} and ${this.settings.maxTags} tags. Return only the tags as a comma-separated list, no other text.`
+              content: `${this.settings.customPrompt}${this.buildVaultTagsInstruction(vaultTags)} Generate between ${this.settings.minTags} and ${this.settings.maxTags} tags. Return only the tags as a comma-separated list, no other text.`
             },
             {
               role: "user",
@@ -314,7 +323,7 @@ var AIService = class {
       throw new Error(i18n.t("error.openaiError", { message: error.message }));
     }
   }
-  async generateTagsWithClaude(content) {
+  async generateTagsWithClaude(content, vaultTags) {
     if (!this.settings.claudeApiKey) {
       return { tags: [], error: i18n.t("error.claudeKeyMissing") };
     }
@@ -332,7 +341,7 @@ var AIService = class {
           messages: [
             {
               role: "user",
-              content: `${this.settings.customPrompt} Generate between ${this.settings.minTags} and ${this.settings.maxTags} tags for this content. Return only the tags as a comma-separated list, no other text.
+              content: `${this.settings.customPrompt}${this.buildVaultTagsInstruction(vaultTags)} Generate between ${this.settings.minTags} and ${this.settings.maxTags} tags for this content. Return only the tags as a comma-separated list, no other text.
 
 Content: ${content.substring(0, 4e3)}`
             }
@@ -368,7 +377,8 @@ var DEFAULT_SETTINGS = {
   excludeExistingTags: true,
   language: "en",
   rateLimit: 10,
-  maxRetries: 3
+  maxRetries: 3,
+  preferVaultTags: true
 };
 
 // main.ts
@@ -413,7 +423,11 @@ var AITaggerPlugin = class extends import_obsidian2.Plugin {
     try {
       const content = await this.app.vault.read(file);
       const contentWithoutFrontmatter = this.removeYamlFrontmatter(content);
-      const response = await this.aiService.generateTags(contentWithoutFrontmatter);
+      const vaultTags = this.settings.preferVaultTags ? this.getVaultTags() : void 0;
+      const response = await this.aiService.generateTags(contentWithoutFrontmatter, vaultTags);
+      if (vaultTags && response.tags.length > 0) {
+        response.tags = this.matchToVaultTags(response.tags, vaultTags);
+      }
       if (response.error) {
         notice.hide();
         new import_obsidian2.Notice(i18n.t("notice.errorGenerating", { error: response.error }));
@@ -427,7 +441,7 @@ var AITaggerPlugin = class extends import_obsidian2.Plugin {
       const existingTags = this.extractExistingTags(content);
       let newTags = response.tags;
       if (this.settings.excludeExistingTags) {
-        newTags = response.tags.filter((tag) => !existingTags.includes(tag));
+        newTags = newTags.filter((tag) => !existingTags.includes(tag));
       }
       if (newTags.length === 0) {
         notice.hide();
@@ -462,6 +476,20 @@ var AITaggerPlugin = class extends import_obsidian2.Plugin {
     } else {
       return tagsMatch[1].split("\n").map((line) => line.trim().replace(/^-\s*/, "").replace(/['"]/g, "")).filter((tag) => tag.length > 0);
     }
+  }
+  getVaultTags() {
+    const tagCounts = this.app.metadataCache.getTags();
+    return Object.keys(tagCounts).map((t) => t.startsWith("#") ? t.slice(1) : t);
+  }
+  matchToVaultTags(aiTags, vaultTags) {
+    const lowerMap = /* @__PURE__ */ new Map();
+    for (const vt of vaultTags) {
+      lowerMap.set(vt.toLowerCase(), vt);
+    }
+    return aiTags.map((tag) => {
+      var _a;
+      return (_a = lowerMap.get(tag.toLowerCase())) != null ? _a : tag;
+    });
   }
   async applyTagsToFile(file, tags) {
     const content = await this.app.vault.read(file);
@@ -648,6 +676,10 @@ var AITaggerSettingTab = class extends import_obsidian2.PluginSettingTab {
     }));
     new import_obsidian2.Setting(containerEl).setName(i18n.t("settings.excludeExisting")).setDesc(i18n.t("settings.excludeExisting.desc")).addToggle((toggle) => toggle.setValue(this.plugin.settings.excludeExistingTags).onChange(async (value) => {
       this.plugin.settings.excludeExistingTags = value;
+      await this.plugin.saveSettings();
+    }));
+    new import_obsidian2.Setting(containerEl).setName(i18n.t("settings.preferVaultTags")).setDesc(i18n.t("settings.preferVaultTags.desc")).addToggle((toggle) => toggle.setValue(this.plugin.settings.preferVaultTags).onChange(async (value) => {
+      this.plugin.settings.preferVaultTags = value;
       await this.plugin.saveSettings();
     }));
     new import_obsidian2.Setting(containerEl).setName(i18n.t("settings.rateLimit")).setDesc(i18n.t("settings.rateLimit.desc")).addSlider((slider) => slider.setLimits(1, 60, 1).setValue(this.plugin.settings.rateLimit).setDynamicTooltip().onChange(async (value) => {

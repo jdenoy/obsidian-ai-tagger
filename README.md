@@ -6,10 +6,14 @@ An Obsidian plugin that automatically generates 2-5 relevant tags for your notes
 
 - **Dual AI Support**: Choose between OpenAI (ChatGPT) or Claude API
 - **Smart Tag Generation**: Generates 2-5 contextually relevant tags per note
+- **Vault Tag Matching**: AI-generated tags are matched against your existing vault tags — vault casing always wins
 - **Batch Processing**: Process all notes in your vault at once
 - **Tag Preview**: Review and select tags before applying them
 - **Customizable**: Configure prompts, tag limits, and behavior
 - **Existing Tag Awareness**: Optionally exclude tags that already exist
+- **Rate Limiting**: Configurable requests-per-minute to avoid quota exhaustion
+- **Retry Logic**: Automatic exponential backoff on transient failures
+- **Multi-language**: English and French interface
 
 ## Installation
 
@@ -65,6 +69,10 @@ An Obsidian plugin that automatically generates 2-5 relevant tags for your notes
 - **Custom Prompt**: Customize the AI prompt for tag generation
 - **Auto Apply Tags**: Skip preview and automatically apply generated tags
 - **Exclude Existing Tags**: Don't generate tags that already exist in the note
+- **Prefer Existing Vault Tags**: Match AI output against vault tags case-insensitively; vault casing wins (default: enabled)
+- **Rate Limit**: Max API requests per minute, 1-60 (default: 10)
+- **Max Retries**: Retry attempts on failure, 1-10 (default: 3)
+- **Language**: Interface language — English or French
 
 ## API Usage and Costs
 
@@ -101,5 +109,4 @@ This plugin is built with TypeScript and uses:
 
 ## License
 
-MIT License - see LICENSE file for details# obsidian-ai-tagger
-# obsidian-ai-tagger
+MIT License - see LICENSE file for details

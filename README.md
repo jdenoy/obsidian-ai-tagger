@@ -20,7 +20,7 @@ An Obsidian plugin that automatically generates 2-5 relevant tags for your notes
 ### Manual Installation
 
 1. Download the latest release from the GitHub releases page
-2. Extract the files to your vault's `.obsidian/plugins/obsidian-ai-tagger/` directory
+2. Extract the files to your vault's `.obsidian/plugins/smart-tagger/` directory
 3. Enable the plugin in Obsidian's Community Plugins settings
 
 ### Building from Source
@@ -28,7 +28,7 @@ An Obsidian plugin that automatically generates 2-5 relevant tags for your notes
 1. Clone this repository
 2. Run `npm install` to install dependencies
 3. Run `npm run build` to build the plugin
-4. Copy `main.js`, `manifest.json`, and `styles.css` to your vault's `.obsidian/plugins/obsidian-ai-tagger/` directory
+4. Copy `main.js`, `manifest.json`, and `styles.css` to your vault's `.obsidian/plugins/smart-tagger/` directory
 
 ## Setup
 

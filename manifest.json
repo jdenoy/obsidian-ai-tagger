@@ -1,11 +1,10 @@
 {
-	"id": "obsidian-ai-tagger",
+	"id": "smart-tagger",
 	"name": "AI Tagger",
 	"version": "1.2.0",
 	"minAppVersion": "0.15.0",
 	"description": "Automatically generate 2-5 relevant tags for your notes using ChatGPT or Claude AI",
 	"author": "Johan Denoyer",
 	"authorUrl": "https://www.johandenoyer.fr",
-	"fundingUrl": "",
 	"isDesktopOnly": false
 }

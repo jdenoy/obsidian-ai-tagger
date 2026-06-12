@@ -1,5 +1,15 @@
 # Updates & Changelog
 
+## Version 1.2.1 - Tag Sanitization Fix
+
+### 🐛 Bug Fix
+- **Space in tags**: Tags containing spaces are now automatically converted to hyphenated form (e.g. `machine learning` → `machine-learning`)
+
+### 🔧 Modified Files
+- `ai-service.ts` - Added `.replace(/\s+/g, '-')` in `parseTags()`
+
+---
+
 ## Version 1.2.0 - Vault Tag Matching
 
 ### 🏷 Vault Tag Awareness
